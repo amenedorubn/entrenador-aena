@@ -1,141 +1,176 @@
 # Entrenador Aena · Niveles A-B
 
-Web app tipo Duolingo para preparar las pruebas selectivas de Aena (Selección Externa
-Niveles A y B, convocatoria 01/07/2026). De uso personal, estática, instalable como PWA
-(offline básico) y desplegable en GitHub Pages sin backend ni login.
+App tipo Duolingo para preparar las pruebas selectivas de Aena (Selección Externa
+Niveles A y B, convocatoria 01/07/2026). Estática, instalable como PWA con offline
+básico y desplegada en GitHub Pages. Sin backend ni login.
 
-Cubre las tres fases del proceso:
+**En vivo:** https://amenedorubn.github.io/entrenador-aena/
 
-- **Fase 1 · Aptitudes** — verbal, numérico y abstracto, con selector de dificultad
-  (fácil / medio / difícil / mix) y un simulacro cronometrado (10 min) que mezcla los tres bloques.
-- **Fase 2 · Competencias conductuales** — juicio situacional alineado a las competencias
-  de la ocupación IC03-A. El examen real es un cuestionario de personalidad: esta app
-  entrena a reconocer las competencias, no lo sustituye.
-- **Fase 3 · Inglés (B1 requisito · B2 mérito)** — grammar, listening (Web Speech API) y
-  speaking (prompts con cronómetro y guía de estructura).
+## Cómo funciona la progresión
+
+Replica el modelo de la app real: **mundo → unidad → lección**.
+
+- **5 mundos** de dificultad creciente (nivel 1 a 5). Cada mundo tiene su temática y color.
+- Cada mundo contiene **unidades** temáticas, con su banner y su trofeo.
+- Cada unidad contiene **lecciones**: los círculos del camino. Estados: completada (✓),
+  disponible (⭐ con burbuja «Empezar») y bloqueada (🔒).
+- Una lección se supera con **≥80 % de aciertos**; eso desbloquea la siguiente.
+- Superadas todas las lecciones de una unidad se gana su **trofeo**; superadas todas las
+  unidades, el mundo se completa y se desbloquea el siguiente.
+- **158 lecciones** en total, de 10 preguntas cada una.
+
+Los cinco mundos:
+
+| # | Mundo | Nivel | Contenido |
+|---|-------|-------|-----------|
+| 1 | Despegue | 1 | Bases de aptitud e inglés B1 |
+| 2 | Ascenso | 2 | Reglas compuestas y primeras competencias |
+| 3 | Crucero | 3 | Nivel examen · B2 |
+| 4 | Aproximación | 4 | Por encima del examen · B2+ |
+| 5 | Aterrizaje | 5 | Nivel élite · C1 |
+
+Además hay **Práctica libre**: cualquier bloque, a cualquiera de los 5 niveles, sin vidas
+y sin afectar al camino. Preguntas nuevas cada vez, así que sirve para repetir tantas
+veces al día como quieras.
+
+## Contenido y dificultad
+
+Casi todo el contenido se **genera por procedimiento**, así que no se agota: cada sesión
+trae preguntas nuevas aunque practiques varias veces al día durante meses.
+
+- **Numérico** — 26 familias repartidas en 5 niveles: series aritméticas y geométricas,
+  diferencias crecientes, ×n+k, intercaladas, cuadrados, Fibonacci, primos, operaciones
+  alternas, segunda diferencia, porcentajes encadenados, mezclas, edades, ritmos de
+  trabajo, interés compuesto, media ponderada, repartos proporcionales, combinatoria
+  (permutaciones, combinaciones, anagramas, comités), probabilidad simple y compuesta,
+  matrices numéricas, ángulos de reloj y problemas multi-paso con IVA.
+- **Abstracto** — 12 familias: rotaciones (fijas y aceleradas), conteo, número de lados,
+  doble transformación, matrices 3×3 de uno, dos y tres atributos, y **operaciones
+  booleanas AND/OR/XOR sobre rejillas** en el nivel máximo.
+- **Verbal** — generado a partir de un léxico con marcas semánticas: sinónimos, antónimos,
+  analogías por tipo de relación, palabra intrusa, series de letras (simples, mixtas
+  letra-número e intercaladas) y **silogismos y condicionales** con validez lógica fijada
+  por forma (Barbara, Darii, Disamis, modus ponens/tollens, y las falacias de término
+  medio no distribuido, afirmación del consecuente y negación del antecedente).
+- **Conductual (Fase 2)** — 45 situaciones de competencias transversales del sector
+  público y del entorno aeroportuario. No se limita a una ocupación concreta porque el
+  examen es común. En los niveles altos las opciones incorrectas son deliberadamente
+  plausibles.
+- **Inglés (Fase 3)** — gramática de B1 a C1, **corrección de errores**, y sobre todo
+  **producción escrita**: traducción ES→EN construyendo la frase con fichas, como en
+  Duolingo. Listening con avisos de aeropuerto (curados y generados con números
+  aleatorios) leídos por la Web Speech API en `en-GB`. Speaking con prompts de entrevista
+  y cronómetro de 2 minutos.
 
 ## Corrección de respuestas
 
-- **Numérico y abstracto se generan por procedimiento** (`js/generators.js`): cada
-  generador calcula el enunciado y la solución con la misma regla, así que la respuesta
-  correcta lo es por construcción. Reglas por dificultad:
-  - Fácil: serie aritmética, % simple, rotación 90°, conteo +1.
-  - Medio: serie geométrica, diferencias crecientes, rotación 45°, nº de lados +1,
-    porcentajes encadenados, proporciones/mezclas, edades.
-  - Difícil: ×n+k, series intercaladas, matriz 3×3, doble transformación (rotación +
-    relleno alternante), combinatoria, ritmos de trabajo, primos/factoriales.
-- **Verbal, grammar, SJT y listening son bancos curados** (`data/*.js`) con muestreo
-  aleatorio y opciones barajadas en cada sesión. Los primeros ítems de cada banco (los
-  marcados en el propio archivo) proceden de `entrenador_aena.html`, ya verificados con
-  cálculo independiente; se han ampliado sin tocar ninguna respuesta correcta.
-  Cuotas actuales: 33 verbal, 33 grammar, 27 SJT, 17 listening.
-- `test/` contiene los tests de corrección (Vitest): verifican que cada generador
-  devuelve una respuesta consistente con su regla (recomputada de forma independiente a
-  partir del propio enunciado) y que en todos los bancos curados el índice de respuesta
-  correcta apunta a la opción esperada, sin duplicados. **Los tests deben pasar** antes
-  de tocar nada de `js/generators.js` o `data/*.js`.
+Es el requisito crítico: una respuesta mal marcada rompe la utilidad de la app.
+
+- **Los generadores calculan enunciado y solución con la misma regla**, así que la
+  respuesta correcta lo es *por construcción*, no por una tabla escrita a mano.
+- **El léxico lleva marcas de campo semántico (`sense`)**. Los distractores se toman
+  siempre de entradas con un `sense` distinto, de modo que un distractor **nunca** puede
+  ser también una respuesta válida. Lo mismo con las analogías (términos de otras
+  relaciones) y con la palabra intrusa (categorías disjuntas).
+- **Las matrices lógicas verifican unicidad**: las dos filas visibles deben descartar
+  todas las demás operaciones booleanas, o el enunciado se regenera. Sin esa comprobación
+  una matriz podía admitir dos reglas y la respuesta no sería única.
+- **83 tests** (Vitest) cubren esto: recomputan la regla de forma independiente a partir
+  del propio enunciado generado, verifican que no hay opciones duplicadas ni distractores
+  ambiguos, y comprueban la integridad de los bancos y del desbloqueo del camino.
+
+```bash
+npm test
+```
 
 ## Diseño
 
-Sistema inspirado en Duolingo (no afiliado, sin logo ni contenido propietario), fuentes
-en `Design duolingo/`. Tokens explícitos usados (`css/styles.css`):
+Réplica del sistema visual de Duolingo (sin afiliación, sin logo ni contenido propietario):
+camino de nodos serpenteante, banners de unidad, botones «sticker» con borde inferior 3D,
+hoja de corrección verde/roja al pie, barra superior con racha/gemas/vidas y nav inferior.
+**Tema claro y oscuro**, seleccionable o siguiendo al sistema.
 
-```
---primary:    #a5ed6e   --on-primary: #111111   --background: #ddf4ff
---text:       #3c3c3c   --text-muted: #777777   --accent:     #1cb0f6
-```
+Paleta de la app real: `#58cc02` verde, `#1cb0f6` azul, `#ff4b4b` rojo, `#ffc800` amarillo,
+`#ce82ff` morado; superficies `#ffffff` (claro) y `#131f24` (oscuro).
+Tipografía **Nunito** (la original, «Feather», es propietaria).
 
-Con las correcciones de accesibilidad que el propio documento de diseño señala como
-fallo de contraste:
+Correcciones de accesibilidad respecto a la referencia:
 
-- `--text-muted` (#777777, ratio ~3.5:1 sobre el fondo) se usa **solo** en
-  etiquetas/hints/captions, nunca en párrafos ni enlaces.
-- `--accent` (#1cb0f6, ratio ~2:1 sobre el fondo) **nunca** es el único indicador de
-  enlace: va siempre subrayado y en negrita.
-- Acierto / error / deshabilitado nunca dependen solo del color: llevan también icono
-  (✓ / ✕), texto y borde grueso.
-- Foco visible (outline 2px) en todo elemento interactivo, targets ≥44×44px, motion
-  300ms `ease` respetando `prefers-reduced-motion`.
-
-Tipografía: **Nunito** (Google Fonts) como sustituta libre de "duolingo-sans"
-(propietaria del original).
+- El estado nunca depende solo del color: acierto/error llevan también icono (✓/✕), texto
+  y borde.
+- Foco visible en todo elemento interactivo, targets ≥44 px.
+- Se respeta `prefers-reduced-motion`.
+- Las figuras SVG llevan `aria-label` descriptivo.
 
 ## Estructura
 
 ```
-index.html                 shell de la app (todas las pantallas)
-manifest.webmanifest        PWA
-service-worker.js           cache-first del shell, offline básico
-icons/                      iconos PWA (generados con scripts/make-icons.mjs)
-css/styles.css              tokens de diseño + componentes
-js/app.js                   rutas, estado de sesión, racha/XP/localStorage
-js/engine.js                render de ítems (texto, figuras SVG, matriz, listening)
-js/generators.js            generadores numérico + abstracto por dificultad
-data/*.js                   bancos curados (verbal, grammar, sjt, listening, speaking)
-test/*.test.js              tests de corrección (Vitest)
-scripts/make-icons.mjs      genera los PNG de icons/ sin dependencias (node scripts/make-icons.mjs)
+index.html                  pantallas: camino, lección, resultados, práctica, speaking, progreso, ajustes
+css/styles.css              sistema visual + tema claro/oscuro
+js/curriculum.js            mundos, unidades, lecciones y reglas de desbloqueo
+js/content.js               dispatcher: (fuente, nivel) → pregunta
+js/gen-numeric.js           26 familias numéricas
+js/gen-abstract.js          12 familias abstractas
+js/gen-verbal.js            verbal: léxico, series de letras, silogismos
+js/gen-english.js           grammar, writing, error correction, listening
+js/rng.js                   utilidades y construcción de opciones sin duplicados
+js/engine.js                render de ítems (texto, SVG, matrices, banco de palabras)
+js/app.js                   navegación, sesión, vidas, XP, racha, tema
+data/lexicon.js             léxico verbal con marcas semánticas
+data/english.js             bancos de inglés
+data/sjt.js                 banco conductual
+test/                       tests de corrección (Vitest)
+scripts/make-icons.mjs      genera los iconos PWA sin dependencias
 ```
 
 ## Desarrollo local
 
-Requiere Node.js (usado: v24). No hay build step: son módulos ES nativos.
+Node.js (probado con v24). No hay build: son módulos ES nativos.
 
 ```bash
-npm install        # instala vitest (única dependencia de desarrollo)
-npm test           # corre los tests de corrección — deben pasar en verde
-npm run serve      # sirve la app en http://localhost:3000 (npx serve .)
+npm install     # única dependencia de desarrollo: vitest
+npm test        # tests de corrección
+npm run serve   # sirve en http://localhost:3000
 ```
 
-Abre la URL que indique `serve` en el navegador. Para probar la instalación como PWA,
-sírvelo también así (Chrome/Edge exigen ese mismo origen para registrar el
-service worker; `file://` no funciona).
+Sírvelo por HTTP (no `file://`) para que se registre el service worker y puedas probar la
+instalación como PWA.
 
-## Desplegar en GitHub Pages
+## Desplegar
 
-1. Crea un repositorio nuevo en GitHub (por ejemplo `entrenador-aena`), vacío, sin
-   README ni licencia (ya los trae este proyecto).
-2. Conéctalo y sube el primer commit (ya hecho localmente):
-   ```bash
-   git remote add origin https://github.com/<tu-usuario>/entrenador-aena.git
-   git branch -M main
-   git push -u origin main
-   ```
-3. En GitHub → **Settings → Pages** → *Build and deployment* → **Source: Deploy from a
-   branch** → branch `main`, carpeta `/ (root)` → **Save**.
-4. Espera 1-2 minutos; la URL pública aparece en esa misma página
-   (`https://<tu-usuario>.github.io/entrenador-aena/`).
-5. El repo ya incluye `.nojekyll` (necesario para que Pages sirva `/data` y `/js` tal
-   cual, sin que Jekyll los ignore) y todas las rutas del proyecto son relativas, así
-   que funciona igual en la raíz de un dominio o en un subpath de GitHub Pages.
+Ya está publicado en GitHub Pages desde la rama `main`, carpeta raíz. Para actualizar:
 
-No hace falta ninguna credencial ni token para estos pasos: `git push` te pedirá
-autenticarte con tu cuenta de GitHub de la forma habitual (HTTPS + login del navegador,
-o SSH si ya lo tienes configurado) — hazlo tú mismo, la app no necesita ni pide nada de eso.
-
-## Ampliar los bancos de preguntas
-
-Cada banco es un array de objetos en `data/*.js`:
-
-```js
-{ id: "v034", difficulty: "medio", prompt: "…", options: ["A","B","C","D"], correctIndex: 1, explanation: "…" }
+```bash
+git add -A && git commit -m "..." && git push
 ```
 
-- `id` único, `correctIndex` es el índice (0-3) de la opción correcta dentro de
-  `options` **antes** de barajar (el barajado ocurre en tiempo de ejecución).
-- `difficulty` (`"facil" | "medio" | "dificil"`) solo aplica al banco `verbal.js`, que
-  participa en el selector de dificultad de Fase 1.
-- Tras añadir ítems, corre `npm test`: si `correctIndex` está mal o faltan opciones, los
-  tests de `test/banks.test.js` fallan.
+Pages reconstruye solo en 1-2 minutos. El repo incluye `.nojekyll` (necesario para que se
+sirvan `/js` y `/data` tal cual) y todas las rutas son relativas.
 
-Para tocar las reglas de los generadores numérico/abstracto, edita `js/generators.js` y
-vuelve a correr `npm test` — `test/generators.test.js` recomputa la regla de forma
-independiente a partir del propio enunciado generado, así que cualquier regresión en la
-lógica se detecta ahí.
+## Ampliar el contenido
+
+- **Añadir preguntas a un banco** (`data/english.js`, `data/sjt.js`): copia la forma de un
+  ítem existente. `correctIndex` es el índice (0-3) de la opción correcta *antes* de
+  barajar; el barajado ocurre en tiempo de ejecución.
+- **Añadir vocabulario** (`data/lexicon.js`): cada entrada necesita un `sense` **único**.
+  Si repites un `sense`, los tests fallan — es justo la comprobación que impide que un
+  distractor sea también correcto.
+- **Añadir una familia de generador**: escribe la función en el `gen-*.js` que
+  corresponda, regístrala en el objeto `*_FAMILIES` bajo su nivel, y añade un test que
+  recompute su regla desde el enunciado.
+- **Cambiar la estructura del curso** (`js/curriculum.js`): las unidades declaran qué
+  fuentes usan y cuántas lecciones tienen; el camino se construye solo.
+
+Después de cualquier cambio: `npm test`.
 
 ## Notas
 
-- No reproduce el logo ni contenido propietario de Duolingo; es un diseño *inspirado
-  en*, con corrección de accesibilidad respecto a la referencia.
-- El progreso (racha, XP, mejores puntuaciones) vive solo en `localStorage` del
-  navegador: no hay cuenta ni sincronización entre dispositivos. El botón "Reiniciar
-  progreso" del menú lo borra todo.
+- El progreso (camino, racha, XP) vive solo en el `localStorage` del navegador. No hay
+  cuenta ni sincronización entre dispositivos. Ajustes → «Reiniciar todo el progreso» lo borra.
+- Las **vidas** se pueden desactivar en Ajustes; a diferencia de Duolingo no hay espera ni
+  pago para recuperarlas: al quedarte sin ellas simplemente terminas la lección y puedes
+  repetirla en el momento.
+- La **fecha del examen** es configurable en Ajustes y alimenta la cuenta atrás.
+- La Fase 2 real es un cuestionario de personalidad APTO/NO APTO: esta app entrena a
+  reconocer las competencias, pero en el examen lo que cuenta es responderlo **entero,
+  con honestidad y coherencia**.

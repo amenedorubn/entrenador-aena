@@ -1,6 +1,6 @@
 // Service worker — cachea el shell estático para uso offline básico.
 // Sube CACHE_VERSION cuando cambies archivos precacheados para forzar la actualización.
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = `aena-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -10,12 +10,16 @@ const PRECACHE_URLS = [
   "./css/styles.css",
   "./js/app.js",
   "./js/engine.js",
-  "./js/generators.js",
-  "./data/verbal.js",
-  "./data/grammar.js",
+  "./js/content.js",
+  "./js/curriculum.js",
+  "./js/rng.js",
+  "./js/gen-numeric.js",
+  "./js/gen-abstract.js",
+  "./js/gen-verbal.js",
+  "./js/gen-english.js",
+  "./data/lexicon.js",
+  "./data/english.js",
   "./data/sjt.js",
-  "./data/listening.js",
-  "./data/speaking.js",
   "./icons/favicon.svg",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

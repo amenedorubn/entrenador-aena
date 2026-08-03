@@ -1,163 +1,201 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Entrenador Aena · Niveles A-B · Fases 1-2-3</title>
-<meta name="description" content="Entrenador tipo Duolingo para preparar la oposición de Aena (Niveles A-B): aptitudes, competencias conductuales e inglés.">
-<meta name="theme-color" content="#a5ed6e">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Entrenador Aena · Niveles A-B</title>
+<meta name="description" content="Entrenamiento diario para la oposición de Aena: aptitudes, competencias e inglés, con progresión por mundos.">
+<meta name="theme-color" content="#58cc02">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./css/styles.css">
 </head>
 <body>
-<div class="wrap">
 
-  <section id="home">
-    <p class="eyebrow">Rubén · IC03-A · Aena Niveles A-B · 03 oct 2026</p>
-    <h1>Entrenador de oposición</h1>
-    <p class="sub">Nivel examen. Fase 1 (aptitudes), Fase 2 (conductual) y Fase 3 (inglés), con corrección y explicación al instante.</p>
-
-    <div class="stat-row">
-      <span class="chip"><span class="val" id="days">–</span><span class="lbl">días</span></span>
-      <span class="chip streak"><span class="val"><span aria-hidden="true">🔥</span> <span id="streak-val">0</span></span><span class="lbl">racha</span></span>
-      <span class="chip xp"><span class="val" id="xp-val">0/50</span><span class="lbl">XP hoy</span></span>
+<!-- ============================ CAMINO ============================ -->
+<section id="screen-path" class="screen active">
+  <header class="topbar">
+    <div class="topbar__inner">
+      <span class="stat stat--days"><span class="stat__icon" aria-hidden="true">📅</span><span id="days">–</span><span class="sr-only">días para el examen</span></span>
+      <span class="stat stat--streak"><span class="stat__icon" aria-hidden="true">🔥</span><span id="streak">0</span><span class="sr-only">días de racha</span></span>
+      <span class="stat stat--gems"><span class="stat__icon" aria-hidden="true">💎</span><span id="xp">0</span><span class="sr-only">XP total</span></span>
+      <span class="stat stat--hearts"><span class="stat__icon" aria-hidden="true">❤️</span><span id="hearts-top">5</span><span class="sr-only">vidas</span></span>
     </div>
+  </header>
+  <main class="path container" id="path"></main>
+</section>
 
-    <div class="stat-row" style="justify-content:space-between">
-      <label class="muted" for="qcount">Preguntas por sesión
-        <select id="qcount" style="font-family:inherit;font-weight:800;border-radius:8px;border:2px solid var(--faded-gray);padding:6px 8px;margin-left:6px">
-          <option value="10">10</option>
-          <option value="15">15</option>
-          <option value="20">20</option>
-        </select>
-      </label>
-      <button type="button" class="link" id="reset-progress" style="background:none;border:none;cursor:pointer;font-family:inherit">Reiniciar progreso</button>
-    </div>
+<!-- ============================ PRÁCTICA ============================ -->
+<section id="screen-practice" class="screen">
+  <main class="page container">
+    <h1 class="page__title">Práctica libre</h1>
+    <p class="note">Sin vidas y sin afectar al camino. Preguntas nuevas cada vez: úsalo tantas veces al día como quieras.</p>
 
-    <div class="glabel">Fase 1 · Aptitudes (0-20, mínimo 10)</div>
-    <p class="muted" id="diff-label">Dificultad:</p>
-    <div class="diff-row" role="group" aria-labelledby="diff-label">
-      <button type="button" class="diff-btn" data-diff="facil" aria-pressed="false">Fácil</button>
-      <button type="button" class="diff-btn" data-diff="medio" aria-pressed="false">Medio</button>
-      <button type="button" class="diff-btn" data-diff="dificil" aria-pressed="false">Difícil</button>
-      <button type="button" class="diff-btn" data-diff="mix" aria-pressed="false">Mix</button>
-    </div>
-    <div class="grid">
-      <button type="button" class="tile" data-start="verbal">
-        <div class="tag">Verbal</div><h3>Razonamiento verbal</h3>
-        <p>Sinónimos, antónimos, analogías, series de letras, deducción lógica.</p>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-          <svg class="ring" data-block="verbal" viewBox="0 0 40 40" aria-hidden="true"><circle class="track" cx="20" cy="20" r="16"/><circle class="fill" cx="20" cy="20" r="16"/></svg>
-          <div class="best" id="best-verbal">Aún sin intentos</div>
-        </div>
-      </button>
-      <button type="button" class="tile" data-start="num">
-        <div class="tag">Numérico</div><h3>Razonamiento numérico</h3>
-        <p>Series, porcentajes, proporciones, problemas, combinatoria.</p>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-          <svg class="ring" data-block="num" viewBox="0 0 40 40" aria-hidden="true"><circle class="track" cx="20" cy="20" r="16"/><circle class="fill" cx="20" cy="20" r="16"/></svg>
-          <div class="best" id="best-num">Aún sin intentos</div>
-        </div>
-      </button>
-      <button type="button" class="tile" data-start="abs">
-        <div class="tag">Abstracto</div><h3>Razonamiento abstracto</h3>
-        <p>Series de figuras y matrices 3×3 tipo Raven.</p>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-          <svg class="ring" data-block="abs" viewBox="0 0 40 40" aria-hidden="true"><circle class="track" cx="20" cy="20" r="16"/><circle class="fill" cx="20" cy="20" r="16"/></svg>
-          <div class="best" id="best-abs">Aún sin intentos</div>
-        </div>
-      </button>
-      <button type="button" class="tile tile-cta wide" data-start="sim">
-        <div class="tag">Simulacro Fase 1 · contrarreloj</div><h3>Simulacro completo</h3>
-        <p>Los tres bloques mezclados, cuenta atrás de 10 min.</p>
-        <div class="best" id="best-sim"></div>
-      </button>
-    </div>
-
-    <div class="glabel">Fase 2 · Competencias conductuales</div>
-    <div class="grid">
-      <button type="button" class="tile wide" data-start="sjt">
-        <div class="tag">Juicio situacional</div><h3>Entrenamiento conductual</h3>
-        <p>Situaciones reales para reconocer las competencias que valora Aena en IC03-A. El test real es un cuestionario de personalidad: respóndelo entero, con honestidad y coherencia.</p>
-        <div class="best" id="best-sjt">Aún sin intentos</div>
-      </button>
-    </div>
-
-    <div class="glabel">Fase 3 · Inglés (B1 requisito · B2 mérito)</div>
-    <div class="grid">
-      <button type="button" class="tile" data-start="grammar">
-        <div class="tag">Grammar · B2</div><h3>Gramática</h3>
-        <p>Condicionales, inversión, gerundio/infinitivo, relativos, phrasal verbs.</p>
-        <div class="best" id="best-grammar">Aún sin intentos</div>
-      </button>
-      <button type="button" class="tile" data-start="listen">
-        <div class="tag">Listening · audio</div><h3>Comprensión oral</h3>
-        <p>Avisos de aeropuerto leídos en voz alta. Pulsa Escuchar.</p>
-        <div class="best" id="best-listen">Aún sin intentos</div>
-      </button>
-      <button type="button" class="tile wide" id="open-speaking">
-        <div class="tag">Speaking · práctica</div><h3>Expresión oral</h3>
-        <p>Prompts tipo entrevista con cronómetro y guía de estructura y conectores.</p>
-      </button>
-    </div>
-  </section>
-
-  <section id="session" class="hidden">
-    <div class="bar"><span class="who" id="who"></span><span class="clock" id="clock">00:00</span></div>
-    <div class="progress"><i id="pfill"></i></div>
-    <div id="intro" class="explain info" style="display:none;margin-bottom:12px" role="note"></div>
     <div class="card">
-      <div class="qnum" id="qnum"></div>
-      <div id="qbody"></div>
-      <div class="opts" id="opts"></div>
-      <div class="explain" id="explain" aria-live="polite"></div>
-      <div class="foot">
-        <button type="button" class="btn ghost" id="quit-btn">Salir</button>
-        <button type="button" class="btn primary" id="next" disabled>Siguiente</button>
+      <div class="card__title">Nivel</div>
+      <div class="segmented" id="practice-tier" role="group" aria-label="Nivel de dificultad">
+        <button type="button" data-tier="1" aria-pressed="false">1</button>
+        <button type="button" data-tier="2" aria-pressed="false">2</button>
+        <button type="button" data-tier="3" aria-pressed="true">3</button>
+        <button type="button" data-tier="4" aria-pressed="false">4</button>
+        <button type="button" data-tier="5" aria-pressed="false">5</button>
+      </div>
+      <p class="note" style="margin-top:10px">1 = base · 3 = nivel examen · 5 = por encima del examen</p>
+    </div>
+
+    <div class="card">
+      <div class="card__title">Bloque</div>
+      <div class="progress-list" id="practice-blocks"></div>
+    </div>
+  </main>
+</section>
+
+<!-- ============================ SPEAKING ============================ -->
+<section id="screen-speaking" class="screen">
+  <main class="page container">
+    <h1 class="page__title">Speaking</h1>
+    <div class="card">
+      <div class="card__title">Prompt de práctica</div>
+      <p class="speak-prompt" id="speak-prompt"></p>
+      <p class="clock-big" id="speak-clock">02:00</p>
+      <div style="display:grid;gap:10px;margin-top:16px">
+        <button type="button" class="btn btn--green btn--wide" id="speak-timer">Iniciar 2 min</button>
+        <button type="button" class="btn btn--ghost btn--wide" id="speak-new">Otro prompt</button>
       </div>
     </div>
-  </section>
-
-  <section id="speaking" class="hidden">
-    <div class="bar"><span class="who">Speaking · práctica</span><span class="clock" id="sclock">02:00</span></div>
     <div class="card">
-      <div class="qnum">Prompt de práctica</div>
-      <div class="prompt-big" id="sprompt"></div>
-      <ul class="tips">
-        <li><b>Estructura:</b> introducción (10s) → 2-3 ideas con ejemplos → conclusión.</li>
+      <div class="card__title">Guía</div>
+      <ul class="speak-tips">
+        <li><b>Estructura:</b> introducción (10 s) → 2-3 ideas con ejemplos → conclusión.</li>
         <li><b>Conectores:</b> <i>to begin with, however, moreover, as a result, in conclusion.</i></li>
-        <li><b>Habla 1-2 min</b> sin memorizar. Si te bloqueas, reformula: <i>what I mean is…</i></li>
-        <li>Graba tu voz con el móvil y escúchate: detectarás muletillas y errores.</li>
+        <li>Habla 1-2 min sin memorizar. Si te bloqueas: <i>what I mean is…</i></li>
+        <li>Grábate con el móvil y escúchate: detectarás muletillas y errores.</li>
       </ul>
-      <p class="note">El oral real de Aena en convocatorias pasadas fue por videollamada (~12 min). Practica en voz alta, no leyendo.</p>
-      <div class="foot">
-        <button type="button" class="btn ghost" id="speaking-home">Menú</button>
-        <span>
-          <button type="button" class="btn ghost" id="stimerbtn">Iniciar 2 min</button>
-          <button type="button" class="btn primary" id="newprompt-btn">Otro prompt</button>
-        </span>
+      <p class="note">El oral de Aena en convocatorias pasadas fue por videollamada (~12 min). Practica en voz alta, no leyendo.</p>
+    </div>
+  </main>
+</section>
+
+<!-- ============================ PERFIL ============================ -->
+<section id="screen-profile" class="screen">
+  <main class="page container">
+    <h1 class="page__title">Progreso</h1>
+    <div class="card">
+      <div class="card__title">Resumen</div>
+      <div class="stat-grid">
+        <div class="stat-box"><span aria-hidden="true">🔥</span><div><div class="stat-box__val" id="p-streak">0</div><div class="stat-box__lbl">Racha</div></div></div>
+        <div class="stat-box"><span aria-hidden="true">💎</span><div><div class="stat-box__val" id="p-xp">0</div><div class="stat-box__lbl">XP total</div></div></div>
+        <div class="stat-box"><span aria-hidden="true">✅</span><div><div class="stat-box__val" id="p-lessons">0</div><div class="stat-box__lbl">Lecciones</div></div></div>
+        <div class="stat-box"><span aria-hidden="true">📅</span><div><div class="stat-box__val" id="p-days">0</div><div class="stat-box__lbl">Días restantes</div></div></div>
       </div>
     </div>
-  </section>
+    <div class="card">
+      <div class="card__title">Mundos</div>
+      <div class="progress-list" id="p-worlds"></div>
+    </div>
+  </main>
+</section>
 
-  <section id="results" class="hidden">
-    <div class="card score">
-      <div class="big" id="rscore">0/0</div>
-      <div class="lbl" id="rpct">0 %</div>
-      <p class="msg" id="rmsg"></p>
-      <div class="foot" style="justify-content:center;gap:12px;margin-top:20px">
-        <button type="button" class="btn ghost" id="results-home">Menú</button>
-        <button type="button" class="btn primary" id="repeat-btn">Repetir bloque</button>
+<!-- ============================ AJUSTES ============================ -->
+<section id="screen-settings" class="screen">
+  <main class="page container">
+    <h1 class="page__title">Ajustes</h1>
+    <div class="card">
+      <div class="row">
+        <div><div class="row__label">Tema</div><div class="row__hint">Claro, oscuro o el del sistema</div></div>
+        <div class="segmented" id="theme-picker" role="group" aria-label="Tema">
+          <button type="button" data-theme-set="light" aria-pressed="false">Claro</button>
+          <button type="button" data-theme-set="dark" aria-pressed="false">Oscuro</button>
+          <button type="button" data-theme-set="auto" aria-pressed="true">Auto</button>
+        </div>
+      </div>
+      <div class="row">
+        <div><div class="row__label">Vidas</div><div class="row__hint">Si las desactivas, los fallos no interrumpen la lección</div></div>
+        <div class="segmented" id="hearts-picker" role="group" aria-label="Vidas">
+          <button type="button" data-hearts="on" aria-pressed="true">Sí</button>
+          <button type="button" data-hearts="off" aria-pressed="false">No</button>
+        </div>
+      </div>
+      <div class="row">
+        <div><div class="row__label">Fecha del examen</div><div class="row__hint">Para la cuenta atrás</div></div>
+        <input type="date" id="exam-date" style="font-family:inherit;font-weight:800;padding:10px;border-radius:12px;border:2px solid var(--border);background:var(--surface);color:var(--text);min-height:44px">
       </div>
     </div>
-  </section>
+    <div class="card">
+      <div class="card__title">Datos</div>
+      <p class="note">El progreso se guarda solo en este navegador. No hay cuenta ni sincronización.</p>
+      <button type="button" class="link-btn danger-btn" id="reset-progress">Reiniciar todo el progreso</button>
+    </div>
+    <div class="card">
+      <div class="card__title">Acerca de</div>
+      <p class="note">Diseño inspirado en Duolingo, sin afiliación ni contenido propietario. Tipografía Nunito (la original es propietaria). Preguntas numéricas, abstractas y verbales generadas por procedimiento: la respuesta correcta lo es por construcción.</p>
+    </div>
+  </main>
+</section>
 
-</div>
+<!-- ============================ LECCIÓN ============================ -->
+<section id="screen-lesson" class="screen">
+  <div class="lesson-head">
+    <button type="button" class="icon-btn" id="lesson-quit" aria-label="Salir de la lección">✕</button>
+    <div class="progressbar"><div class="progressbar__fill" id="lesson-progress"></div></div>
+    <span class="hearts" id="lesson-hearts"><span aria-hidden="true">❤️</span><span id="hearts-count">5</span></span>
+  </div>
+  <main class="lesson-body">
+    <p class="lesson-kicker" id="lesson-kicker"></p>
+    <div id="lesson-question"></div>
+    <div id="lesson-answer"></div>
+  </main>
+  <div class="feedback" id="feedback" aria-live="polite">
+    <div class="feedback__inner">
+      <div class="feedback__title"><span class="feedback__icon" id="feedback-icon" aria-hidden="true"></span><span id="feedback-head"></span></div>
+      <p class="feedback__solution hidden" id="feedback-solution"></p>
+      <p class="feedback__text" id="feedback-text"></p>
+      <button type="button" class="btn btn--green btn--wide" id="feedback-next">Continuar</button>
+    </div>
+  </div>
+  <div class="sticky-foot" id="check-foot">
+    <div class="sticky-foot__inner">
+      <button type="button" class="btn btn--green btn--wide" id="check-btn" disabled>Comprobar</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ RESULTADOS ============================ -->
+<section id="screen-results" class="screen">
+  <main class="results">
+    <div>
+      <div class="results__spark" aria-hidden="true" id="results-spark">🎉</div>
+      <h1 class="results__title" id="results-title">¡Lección completada!</h1>
+      <p class="results__sub" id="results-sub"></p>
+      <div class="badges">
+        <div class="badge badge--xp"><div class="badge__label">XP ganado</div><div class="badge__value" id="results-xp">+0</div></div>
+        <div class="badge badge--acc" id="results-acc-badge"><div class="badge__label">Precisión</div><div class="badge__value" id="results-acc">0 %</div></div>
+      </div>
+    </div>
+  </main>
+  <div class="sticky-foot">
+    <div class="sticky-foot__inner">
+      <button type="button" class="btn btn--green btn--wide" id="results-continue">Continuar</button>
+      <button type="button" class="btn btn--ghost btn--wide" id="results-repeat">Repetir lección</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ NAV INFERIOR ============================ -->
+<nav class="bottomnav" id="bottomnav" aria-label="Navegación principal">
+  <div class="bottomnav__inner">
+    <button type="button" class="navbtn" data-nav="path" aria-current="page"><span aria-hidden="true">🏠</span><span class="navbtn__label">Camino</span></button>
+    <button type="button" class="navbtn" data-nav="practice"><span aria-hidden="true">💪</span><span class="navbtn__label">Práctica</span></button>
+    <button type="button" class="navbtn" data-nav="speaking"><span aria-hidden="true">🎙️</span><span class="navbtn__label">Speaking</span></button>
+    <button type="button" class="navbtn" data-nav="profile"><span aria-hidden="true">📊</span><span class="navbtn__label">Progreso</span></button>
+    <button type="button" class="navbtn" data-nav="settings"><span aria-hidden="true">⚙️</span><span class="navbtn__label">Ajustes</span></button>
+  </div>
+</nav>
+
 <script type="module" src="./js/app.js"></script>
 </body>
 </html>
