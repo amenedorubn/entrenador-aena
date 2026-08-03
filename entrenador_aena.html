@@ -1,0 +1,327 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrenador Aena Niveles A-B · Fases 1-2-3</title>
+<style>
+  :root{
+    --ink:#0d1b2a;--ink-2:#13273b;--line:#26405a;
+    --card:#f6f8fb;--card-line:#dfe6ee;--text:#0f2030;--muted:#5c7086;
+    --amber:#e6a532;--cyan:#2f8fa8;--violet:#7c6bd4;--green:#2f9e6e;
+    --ok:#1f9d6b;--no:#d1495b;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"Segoe UI",Inter,system-ui,-apple-system,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}html,body{margin:0}
+  body{background:var(--ink);color:#e8eef5;font-family:var(--sans);line-height:1.5;min-height:100vh;padding:24px 16px}
+  .wrap{max-width:720px;margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);margin:0 0 6px}
+  h1{font-size:clamp(26px,6vw,38px);line-height:1.05;margin:0 0 4px;font-weight:800;letter-spacing:-.02em}
+  .sub{color:#9fb2c6;margin:0 0 18px;font-size:15px}
+  .count{display:inline-flex;align-items:baseline;gap:8px;background:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:6px 14px;margin-bottom:8px}
+  .count b{font-family:var(--mono);font-size:18px;color:var(--amber)}
+  .count span{font-size:12px;color:#9fb2c6;text-transform:uppercase;letter-spacing:.08em}
+  .glabel{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#9fb2c6;margin:24px 0 10px;border-top:1px solid var(--line);padding-top:16px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .tile{appearance:none;text-align:left;cursor:pointer;color:var(--text);background:var(--card);border:1px solid var(--card-line);border-radius:14px;padding:15px;transition:transform .08s,box-shadow .15s}
+  .tile:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.28)}
+  .tile:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+  .tile .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+  .tile h3{margin:6px 0 2px;font-size:17px}
+  .tile p{margin:0;font-size:12.5px;color:var(--muted)}
+  .tile .best{margin-top:8px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .t-verbal .tag{color:var(--cyan)}.t-num .tag{color:var(--amber)}.t-abs .tag{color:var(--violet)}
+  .t-sjt .tag{color:var(--green)}.t-eng .tag{color:#d98a5b}
+  .t-sim,.wide{grid-column:1/-1}
+  .t-sim{background:var(--ink-2);color:#e8eef5;border-color:var(--line)}.t-sim p{color:#9fb2c6}
+  .bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px}
+  .bar .who{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#9fb2c6}
+  .clock{font-family:var(--mono);font-size:16px;color:var(--amber)}
+  .progress{height:6px;background:var(--ink-2);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-bottom:16px}
+  .progress i{display:block;height:100%;background:var(--amber);width:0;transition:width .25s}
+  .card{background:var(--card);color:var(--text);border:1px solid var(--card-line);border-radius:16px;padding:20px}
+  .qnum{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.08em}
+  .q{font-size:17px;font-weight:650;margin:6px 0 4px}
+  .q .series{font-family:var(--mono);font-weight:700;letter-spacing:.06em}
+  .figrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0 2px}
+  .figrow .qmark{font-family:var(--mono);font-size:28px;color:var(--muted);width:72px;text-align:center}
+  .fig{width:72px;height:72px;background:#fff;border:1px solid var(--card-line);border-radius:10px;display:flex;align-items:center;justify-content:center}
+  .matrix{display:grid;grid-template-columns:repeat(3,72px);gap:6px;margin:12px 0 2px}
+  .mcell{width:72px;height:72px;background:#fff;border:1px solid var(--card-line);border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .mcell .qmark{font-family:var(--mono);font-size:26px;color:var(--muted)}
+  .opts{display:grid;gap:10px;margin-top:16px}
+  .opts.figs{grid-template-columns:1fr 1fr}
+  .opt{appearance:none;cursor:pointer;text-align:left;font-size:15px;color:var(--text);background:#fff;border:1.5px solid var(--card-line);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;transition:border-color .1s,background .1s}
+  .opt:hover{border-color:var(--amber)}.opt:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+  .opt .k{font-family:var(--mono);font-size:13px;color:var(--muted);border:1px solid var(--card-line);border-radius:6px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex:none}
+  .opt.figopt{justify-content:center}
+  .opt.correct{border-color:var(--ok);background:rgba(31,157,107,.10)}
+  .opt.wrong{border-color:var(--no);background:rgba(209,73,91,.10)}
+  .opt.correct .k{border-color:var(--ok);color:var(--ok)}.opt.wrong .k{border-color:var(--no);color:var(--no)}
+  .opt[disabled]{cursor:default}
+  .explain{margin-top:14px;padding:12px 14px;border-radius:12px;font-size:14px;display:none}
+  .explain.show{display:block}
+  .explain.good{background:rgba(31,157,107,.10);border:1px solid rgba(31,157,107,.4)}
+  .explain.bad{background:rgba(209,73,91,.10);border:1px solid rgba(209,73,91,.4)}
+  .explain.info{background:rgba(230,165,50,.10);border:1px solid rgba(230,165,50,.45)}
+  .explain b{color:var(--text)}
+  .foot{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:12px}
+  .btn{appearance:none;cursor:pointer;font-family:var(--sans);font-size:15px;font-weight:650;border-radius:11px;padding:11px 18px;border:1px solid transparent}
+  .btn.primary{background:var(--amber);color:#231703}.btn.primary[disabled]{opacity:.4;cursor:default}
+  .btn.ghost{background:#fff;color:var(--text);border-color:var(--card-line)}.btn.ghost:hover{border-color:var(--amber)}
+  .score{text-align:center;padding:28px 20px}
+  .score .big{font-family:var(--mono);font-size:56px;font-weight:800;color:var(--amber);line-height:1}
+  .score .lbl{color:var(--muted);font-size:14px;margin-top:4px}.score .msg{margin:16px auto 0;max-width:440px;color:var(--text)}
+  .hidden{display:none}
+  .prompt-big{font-size:20px;font-weight:700;margin:6px 0 14px}
+  .tips{font-size:14px;color:var(--text)}.tips li{margin:4px 0}
+  .note{font-size:13px;color:var(--muted);margin-top:10px}
+</style>
+
+<div class="wrap">
+  <section id="home">
+    <p class="eyebrow">Rubén · IC03-A · Aena Niveles A-B · 3 oct 2026</p>
+    <h1>Entrenador de oposición</h1>
+    <p class="sub">Nivel examen. Fase 1 (aptitudes), Fase 2 (conductual) y Fase 3 (inglés), con corrección y explicación al instante.</p>
+    <div class="count"><b id="days">–</b><span>días para el examen</span></div>
+
+    <div class="glabel">Fase 1 · Aptitudes (0-20, mínimo 10)</div>
+    <div class="grid">
+      <button class="tile t-verbal" onclick="start('verbal')"><div class="tag">Verbal · difícil</div><h3>Razonamiento verbal</h3><p>Analogías cultas, series mixtas, deducción lógica.</p><div class="best" id="best-verbal"></div></button>
+      <button class="tile t-num" onclick="start('num')"><div class="tag">Numérico · difícil</div><h3>Razonamiento numérico</h3><p>Doble patrón, multi-paso, %, proporciones, problemas.</p><div class="best" id="best-num"></div></button>
+      <button class="tile t-abs" onclick="start('abs')"><div class="tag">Abstracto · difícil</div><h3>Razonamiento abstracto</h3><p>Matrices 3×3 y series con doble transformación.</p><div class="best" id="best-abs"></div></button>
+      <button class="tile t-sim" onclick="start('sim')"><div class="tag">Simulacro Fase 1 · contrarreloj</div><h3>Simulacro completo</h3><p>Los tres bloques mezclados, cuenta atrás de 10 min.</p><div class="best" id="best-sim"></div></button>
+    </div>
+
+    <div class="glabel">Fase 2 · Competencias conductuales (APTO / NO APTO)</div>
+    <div class="grid">
+      <button class="tile t-sjt wide" onclick="start('sjt')"><div class="tag">Juicio situacional</div><h3>Entrenamiento conductual</h3><p>Situaciones reales para reconocer las competencias que valora Aena en IC03-A. Lee primero la nota de arriba de la sesión.</p><div class="best" id="best-sjt"></div></button>
+    </div>
+
+    <div class="glabel">Fase 3 · Inglés (B1 requisito · B2 mérito)</div>
+    <div class="grid">
+      <button class="tile t-eng" onclick="start('grammar')"><div class="tag">Grammar · B2</div><h3>Gramática</h3><p>Condicionales, inversión, gerundio/infinitivo, relativos.</p><div class="best" id="best-grammar"></div></button>
+      <button class="tile t-eng" onclick="start('listen')"><div class="tag">Listening · audio</div><h3>Comprensión oral</h3><p>Avisos de aeropuerto leídos en voz alta. Pulsa Escuchar.</p><div class="best" id="best-listen"></div></button>
+      <button class="tile t-eng wide" onclick="openSpeaking()"><div class="tag">Speaking · práctica</div><h3>Expresión oral</h3><p>Prompts tipo entrevista con cronómetro y guía de estructura.</p></button>
+    </div>
+  </section>
+
+  <section id="session" class="hidden">
+    <div class="bar"><span class="who" id="who"></span><span class="clock" id="clock">00:00</span></div>
+    <div class="progress"><i id="pfill"></i></div>
+    <div id="intro" class="explain info" style="display:none;margin-bottom:12px"></div>
+    <div class="card">
+      <div class="qnum" id="qnum"></div>
+      <div id="qbody"></div>
+      <div class="opts" id="opts"></div>
+      <div class="explain" id="explain"></div>
+      <div class="foot"><button class="btn ghost" onclick="quit()">Salir</button><button class="btn primary" id="next" disabled onclick="next()">Siguiente</button></div>
+    </div>
+  </section>
+
+  <section id="speaking" class="hidden">
+    <div class="bar"><span class="who">Speaking · práctica</span><span class="clock" id="sclock">02:00</span></div>
+    <div class="card">
+      <div class="qnum">Prompt de práctica</div>
+      <div class="prompt-big" id="sprompt"></div>
+      <ul class="tips">
+        <li><b>Estructura:</b> introducción (10s) → 2-3 ideas con ejemplos → conclusión.</li>
+        <li><b>Conectores:</b> <i>to begin with, however, moreover, as a result, in conclusion.</i></li>
+        <li><b>Habla 1-2 min</b> sin memorizar. Si te bloqueas, reformula: <i>what I mean is…</i></li>
+        <li>Graba tu voz con el móvil y escúchate: detectarás muletillas y errores.</li>
+      </ul>
+      <p class="note">El oral real de Aena en convocatorias pasadas fue por videollamada (~12 min). Practica en voz alta, no leyendo.</p>
+      <div class="foot"><button class="btn ghost" onclick="goHome()">Menú</button>
+        <span><button class="btn ghost" id="stimerbtn" onclick="toggleSpeakTimer()">Iniciar 2 min</button>
+        <button class="btn primary" onclick="newPrompt()">Otro prompt</button></span></div>
+    </div>
+  </section>
+
+  <section id="results" class="hidden">
+    <div class="card score">
+      <div class="big" id="rscore">0/0</div><div class="lbl" id="rpct">0 %</div>
+      <p class="msg" id="rmsg"></p>
+      <div class="foot" style="justify-content:center;gap:12px;margin-top:20px">
+        <button class="btn ghost" onclick="goHome()">Menú</button>
+        <button class="btn primary" onclick="repeat()">Repetir bloque</button></div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ================= BANCOS (respuestas verificadas) ================= */
+/* Alfabeto sin Ñ para series de letras */
+const VERBAL=[
+ {q:`Analogía: <b>ictiología</b> es a <b>peces</b> como <b>ornitología</b> es a…`,o:["reptiles","aves","insectos","mamíferos"],c:1,e:`La ornitología es el estudio de las <b>aves</b>.`},
+ {q:`Sinónimo de <b>pusilánime</b>:`,o:["valiente","cobarde","generoso","astuto"],c:1,e:`Pusilánime = falto de valor → <b>cobarde</b>.`},
+ {q:`Antónimo de <b>magnánimo</b>:`,o:["generoso","noble","mezquino","indulgente"],c:2,e:`Magnánimo = generoso, noble. Su contrario es <b>mezquino</b>.`},
+ {q:`Serie mixta: <span class="series">A1, C2, E3, G4, ?</span>`,o:["I5","H5","I4","J5"],c:0,e:`Letras +2 (A,C,E,G→I) y números +1 (1,2,3,4→5) → <b>I5</b> (alfabeto sin Ñ).`},
+ {q:`¿Cuál no encaja?`,o:["avestruz","pingüino","kiwi","águila"],c:3,e:`Avestruz, pingüino y kiwi son aves <b>no voladoras</b>; el <b>águila</b> vuela.`},
+ {q:`Analogía: <b>prólogo</b> es a <b>libro</b> como <b>preámbulo</b> es a…`,o:["capítulo","ley","epílogo","índice"],c:1,e:`El preámbulo es el texto introductorio de una <b>ley</b> o constitución.`},
+ {q:`Sinónimo de <b>conspicuo</b>:`,o:["oculto","insignificante","destacado","común"],c:2,e:`Conspicuo = ilustre, sobresaliente → <b>destacado</b>.`},
+ {q:`Silogismo: «Todos los A son B. Algunos B son C.» ¿Qué se deduce con certeza?`,o:["Algunos A son C","Ningún A es C","No se deduce que algún A sea C","Todos los C son A"],c:2,e:`Que algunos B sean C no obliga a que esos B sean A. <b>No se deduce necesariamente</b>.`},
+ {q:`Serie intercalada: <span class="series">B, N, D, O, F, P, ?</span>`,o:["G","H","Q","R"],c:1,e:`Dos series: B,D,F (+2) y N,O,P (+1). Toca la primera → <b>H</b>.`},
+ {q:`Antónimo de <b>prístino</b>:`,o:["puro","original","deteriorado","nuevo"],c:2,e:`Prístino = puro, original. Su contrario es <b>deteriorado</b>.`},
+ {q:`Analogía: <b>cardiólogo</b> es a <b>corazón</b> como <b>neumólogo</b> es a…`,o:["riñones","pulmones","cerebro","hígado"],c:1,e:`El neumólogo trata los <b>pulmones</b>.`},
+ {q:`Completa: «El informe era tan ___ que la audiencia perdió el hilo.»`,o:["conciso","ameno","farragoso","breve"],c:2,e:`Farragoso = confuso y recargado → hace perder el hilo.`},
+ {q:`<b>Dirimir</b> un conflicto significa:`,o:["agravarlo","resolverlo","ignorarlo","provocarlo"],c:1,e:`Dirimir = zanjar, <b>resolver</b> una controversia.`},
+];
+const NUM=[
+ {q:`Serie: <span class="series">3, 4, 6, 9, 13, 18, ?</span>`,o:["22","23","24","25"],c:2,e:`Diferencias +1,+2,+3,+4,+5 → siguiente +6 → 18+6 = <b>24</b>.`},
+ {q:`Serie: <span class="series">2, 5, 11, 23, 47, ?</span>`,o:["94","95","96","97"],c:1,e:`Regla ×2 + 1 → 47×2+1 = <b>95</b>.`},
+ {q:`Serie: <span class="series">2, 3, 5, 7, 11, 13, ?</span>`,o:["15","16","17","19"],c:2,e:`Son números primos consecutivos → siguiente <b>17</b>.`},
+ {q:`Serie: <span class="series">1, 2, 4, 3, 9, 4, 16, 5, ?</span>`,o:["6","20","25","36"],c:2,e:`Posiciones impares: 1,4,9,16 (cuadrados) → <b>25</b>. (Las pares 2,3,4,5 van aparte.)`},
+ {q:`Un tren recorre 210 km en 2 h 30 min. Velocidad media:`,o:["80 km/h","84 km/h","90 km/h","105 km/h"],c:1,e:`210 ÷ 2,5 h = <b>84 km/h</b>.`},
+ {q:`Un precio sube un 10 % y luego baja un 10 %. Respecto al inicial:`,o:["queda igual","sube 1 %","baja 1 %","baja 10 %"],c:2,e:`1,10 × 0,90 = 0,99 → queda al 99 % → <b>baja 1 %</b>.`},
+ {q:`Tienes 20 L de disolución al 30 % de alcohol. ¿Cuánta agua añadir para bajarla al 20 %?`,o:["5 L","10 L","15 L","20 L"],c:1,e:`Alcohol = 6 L. 6 / (20+x) = 0,20 → 20+x = 30 → x = <b>10 L</b>.`},
+ {q:`Serie: <span class="series">2, 6, 12, 20, 30, ?</span>`,o:["40","42","44","46"],c:1,e:`Diferencias +4,+6,+8,+10 → +12 → 30+12 = <b>42</b> (patrón n·(n+1)).`},
+ {q:`Ana tiene el triple de edad que Beto. Dentro de 10 años tendrá el doble. Edad actual de Beto:`,o:["5","10","15","20"],c:1,e:`3B+10 = 2(B+10) → 3B+10 = 2B+20 → B = <b>10</b>.`},
+ {q:`¿De cuántas formas se pueden ordenar 4 personas en fila?`,o:["12","16","24","64"],c:2,e:`4! = 4×3×2×1 = <b>24</b>.`},
+ {q:`Serie: <span class="series">1, 2, 6, 24, 120, ?</span>`,o:["360","600","720","840"],c:2,e:`Se multiplica por 2, 3, 4, 5 → siguiente ×6 → 120×6 = <b>720</b>.`},
+ {q:`Tras un descuento del 20 %, un artículo cuesta 96 €. Precio original:`,o:["112 €","115 €","120 €","124 €"],c:2,e:`96 = 0,80 × P → P = 96 / 0,8 = <b>120 €</b>.`},
+ {q:`Dos operarios tardan 6 h cada uno (por separado) en una tarea. Juntos tardan:`,o:["2 h","3 h","4 h","6 h"],c:1,e:`Ritmos 1/6 + 1/6 = 1/3 por hora → <b>3 h</b>.`},
+ {q:`Un vuelo despega a las 23:50 y dura 6 h 40 min (mismo huso). Llega a las:`,o:["05:30","06:10","06:30","06:50"],c:2,e:`23:50 + 6 h = 05:50; + 40 min = <b>06:30</b>.`},
+];
+const ABS=[
+ {t:"series",seq:[{k:"arrow",a:0},{k:"arrow",a:45},{k:"arrow",a:90}],opts:[{k:"arrow",a:90},{k:"arrow",a:135},{k:"arrow",a:180},{k:"arrow",a:0}],cIdx:1,e:`Giro horario de <b>45°</b> por paso → 135°.`},
+ {t:"matrix",cells:[{k:"dots",n:2},{k:"dots",n:3},{k:"dots",n:4},{k:"dots",n:3},{k:"dots",n:4},{k:"dots",n:5},{k:"dots",n:4},{k:"dots",n:5},null],opts:[{k:"dots",n:5},{k:"dots",n:6},{k:"dots",n:7},{k:"dots",n:4}],cIdx:1,e:`Cada fila y columna suma 1 punto → <b>6</b>.`},
+ {t:"matrix",cells:[{k:"poly",n:3},{k:"poly",n:4},{k:"poly",n:5},{k:"poly",n:4},{k:"poly",n:5},{k:"poly",n:6},{k:"poly",n:5},{k:"poly",n:6},null],opts:[{k:"poly",n:6},{k:"poly",n:7},{k:"poly",n:8},{k:"poly",n:5}],cIdx:1,e:`El nº de lados sube 1 por fila y columna → <b>heptágono (7)</b>.`},
+ {t:"series",seq:[{k:"sqfill",p:0,fill:false},{k:"sqfill",p:1,fill:true},{k:"sqfill",p:2,fill:false}],opts:[{k:"sqfill",p:3,fill:true},{k:"sqfill",p:3,fill:false},{k:"sqfill",p:2,fill:true},{k:"sqfill",p:0,fill:true}],cIdx:0,e:`Dos reglas a la vez: el punto rota por las esquinas en horario (→ inferior izq.) y el relleno alterna (→ relleno).`},
+ {t:"series",seq:[{k:"arrow",a:45},{k:"arrow",a:90},{k:"arrow",a:135}],opts:[{k:"arrow",a:180},{k:"arrow",a:135},{k:"arrow",a:225},{k:"arrow",a:90}],cIdx:0,e:`Giro horario de 45° → <b>180°</b>.`},
+ {t:"series",seq:[{k:"dots",n:9},{k:"dots",n:7},{k:"dots",n:5}],opts:[{k:"dots",n:2},{k:"dots",n:3},{k:"dots",n:4},{k:"dots",n:1}],cIdx:1,e:`Se restan 2 puntos: 9, 7, 5 → <b>3</b>.`},
+];
+const GRAMMAR=[
+ {q:`If I ___ known, I would have told you.`,o:["have","had","would have","has"],c:1,e:`3ª condicional: <b>If I had known…</b>`},
+ {q:`She's used to ___ up early.`,o:["get","getting","got","gets"],c:1,e:`«be used to» + gerundio → <b>getting</b> up.`},
+ {q:`By next June, they ___ here for a decade.`,o:["will live","will have lived","have lived","lived"],c:1,e:`Futuro perfecto: acción completada antes de un momento futuro → <b>will have lived</b>.`},
+ {q:`I'd rather you ___ smoke in here.`,o:["don't","didn't","won't","not"],c:1,e:`«I'd rather you» + pasado (subjuntivo) → <b>didn't</b>.`},
+ {q:`Neither of the answers ___ correct.`,o:["is","are","were","be"],c:0,e:`«Neither of» toma verbo en singular → <b>is</b>.`},
+ {q:`He denied ___ the documents.`,o:["to take","taking","take","taken"],c:1,e:`«deny» + gerundio → <b>taking</b>.`},
+ {q:`It's high time we ___.`,o:["leave","left","leaving","have left"],c:1,e:`«It's high time» + pasado → <b>left</b>.`},
+ {q:`Not only ___ late, but he also lost the file.`,o:["he was","was he","he is","did he"],c:1,e:`Inversión tras «Not only» al inicio → <b>was he</b> late.`},
+ {q:`You ___ have told me earlier; now it's too late.`,o:["should","must","can","would"],c:0,e:`Reproche sobre el pasado → <b>should</b> have told.`},
+ {q:`We won't start ___ he arrives.`,o:["until","unless","since","while"],c:0,e:`«no… hasta que» → <b>until</b>.`},
+ {q:`That's the engineer ___ report we discussed.`,o:["who","whom","whose","which"],c:2,e:`Posesivo (el informe del ingeniero) → <b>whose</b>.`},
+ {q:`Hardly ___ the airport when the flight was cancelled.`,o:["I had reached","had I reached","I reached","did I reach"],c:1,e:`Inversión tras «Hardly» → <b>had I reached</b>… when…`},
+ {q:`The meeting was called ___ because of the storm.`,o:["off","up","on","out"],c:0,e:`«call off» = cancelar → <b>off</b>.`},
+];
+/* Fase 2 · Juicio situacional. Marca la opción MÁS alineada con la competencia. */
+const SJT=[
+ {q:`Una compañía aérea te reclama, muy molesta, por un retraso que NO depende de ti. ¿Qué haces?`,o:["Le explicas que no es tu culpa y cortas la conversación","Escuchas, muestras empatía, das información clara y buscas solución en tu ámbito","Le das la razón en todo para que se calme","Derivas la queja a otro sin más"],c:1,e:`Sensibilidad hacia el cliente: escuchar, informar y resolver en tu ámbito, sin ponerte a la defensiva.`},
+ {q:`Detectas que un subcontratista incumple una norma de seguridad en plataforma. ¿Qué haces?`,o:["Lo comentas de pasada y sigues","Lo comunicas por el cauce establecido y lo documentas","No dices nada para no crear conflicto","Esperas a ver si se repite"],c:1,e:`La seguridad no admite «mirar a otro lado»: comunicar por el cauce y documentar.`},
+ {q:`Un compañero está saturado y su parte va a hacer que el equipo incumpla un plazo. ¿Qué haces?`,o:["Avisas al jefe de que él va retrasado","Te ofreces a ayudar y repriorizáis juntos","Sigues con lo tuyo; es su problema","Asumes su trabajo en silencio y te sobrecargas"],c:1,e:`Trabajo en equipo: apoyar y repriorizar de forma conjunta orientándose al objetivo común.`},
+ {q:`Te encargan un estudio con datos incompletos y plazo ajustado. ¿Qué haces?`,o:["Entregas lo que salga sin avisar","Analizas, señalas las limitaciones y propones supuestos y un plan","Rechazas la tarea por falta de datos","Pides ampliar el plazo indefinidamente"],c:1,e:`Análisis + efectividad: reconocer límites, hacer supuestos razonados y proponer un plan viable.`},
+ {q:`Una propuesta ahorra costes pero aumenta el impacto ambiental. ¿Qué defiendes?`,o:["El ahorro manda, sea como sea","Una alternativa que cumpla la normativa ambiental aunque cueste algo más","Ignoras el tema ambiental","Paralizas cualquier propuesta con coste"],c:1,e:`Sensibilidad medioambiental: buscar el equilibrio cumpliendo la normativa, no maximizar solo el ahorro.`},
+ {q:`En una reunión con un cliente, tu responsable toma una decisión con la que no estás de acuerdo. ¿Qué haces?`,o:["Le contradices delante del cliente","Aportas tu punto de vista después, en privado","Ejecutas mal la decisión para demostrar que era errónea","Te desentiendes del asunto"],c:1,e:`Comunicación e imagen de equipo: discrepar por el cauce adecuado (en privado), sin romper la unidad ante el cliente.`},
+];
+/* Fase 3 · Listening (voz del navegador; una sola voz por claridad) */
+const LISTEN=[
+ {audio:"Attention passengers. The ten forty-five service to Barcelona is delayed by forty minutes. Boarding will now begin at gate twenty-two.",q:`How long is the flight delayed?`,o:["Fourteen minutes","Forty minutes","Four minutes","Fifty minutes"],c:1,e:`«delayed by forty minutes» → 40 min. Sale por la puerta 22.`},
+ {audio:"Due to strong winds, arriving aircraft are being held. We expect normal operations to resume within the hour.",q:`Why are arriving aircraft being held?`,o:["Because of fog","Because of strong winds","Because of a strike","Because of a technical fault"],c:1,e:`«Due to strong winds» → viento fuerte.`},
+ {audio:"Passengers travelling with hand luggage only may go straight to security. Checked bags must be dropped at desk fourteen before nine a m.",q:`Where must checked bags be dropped?`,o:["At the gate","At desk fourteen","At security","At desk forty"],c:1,e:`«dropped at desk fourteen» → mostrador 14.`},
+ {audio:"The shuttle bus to terminal two leaves every fifteen minutes from stop C, just outside arrivals.",q:`How often does the shuttle leave?`,o:["Every five minutes","Every fifteen minutes","Every fifty minutes","Every hour"],c:1,e:`«every fifteen minutes» → cada 15 min, parada C.`},
+ {audio:"For your safety, please keep your seatbelt fastened while seated, as we may experience sudden turbulence.",q:`Why should passengers keep their seatbelt on?`,o:["To leave quickly","Because of possible turbulence","It is the law only at take-off","To save time"],c:1,e:`«we may experience sudden turbulence» → posibles turbulencias.`},
+];
+const SPEAK_PROMPTS=[
+ "Describe your current job and your main responsibilities.",
+ "Talk about a difficult problem you solved at work. What did you do?",
+ "Should airports focus more on growth or on sustainability? Give your opinion and reasons.",
+ "Describe your home city and what you would recommend to a first-time visitor.",
+ "A flight is delayed and passengers are getting angry. What would you do and say?",
+ "Talk about a skill you would like to improve and how you plan to do it.",
+];
+
+/* ================= FIGURAS ================= */
+function fig(spec){const s=72,c=36;
+ if(spec.k==="arrow"){return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><g transform="rotate(${spec.a} ${c} ${c})"><line x1="16" y1="36" x2="52" y2="36" stroke="#7c6bd4" stroke-width="5" stroke-linecap="round"/><path d="M52 26 L64 36 L52 46 Z" fill="#7c6bd4"/></g></svg>`;}
+ if(spec.k==="dots"){let d="";const pos=[[20,20],[36,20],[52,20],[20,36],[36,36],[52,36],[20,52],[36,52],[52,52]];for(let i=0;i<spec.n&&i<pos.length;i++){const p=pos[i];d+=`<circle cx="${p[0]}" cy="${p[1]}" r="5.5" fill="#2f8fa8"/>`}return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}">${d}</svg>`;}
+ if(spec.k==="poly"){const n=spec.n,r=24,pts=[];for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n;pts.push([c+r*Math.cos(a),c+r*Math.sin(a)])}return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><polygon points="${pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")}" fill="none" stroke="#e6a532" stroke-width="4" stroke-linejoin="round"/></svg>`;}
+ if(spec.k==="sqfill"){const m=[[18,18],[54,18],[54,54],[18,54]][spec.p];const f=spec.fill?"#7c6bd4":"none";const dc=spec.fill?"#ffffff":"#7c6bd4";return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><rect x="14" y="14" width="44" height="44" fill="${f}" stroke="#7c6bd4" stroke-width="4"/><circle cx="${m[0]}" cy="${m[1]}" r="6" fill="${dc}"/></svg>`;}
+ return "";
+}
+
+/* ================= MOTOR ================= */
+const KEYS=["A","B","C","D"];
+let deck=[],i=0,correct=0,answered=false,mode="verbal";
+let timer=null,secs=0,countdown=false,remaining=0,currentAudio="";
+let spTimer=null,spLeft=120,spRunning=false;
+
+function shuffle(a){a=a.slice();for(let j=a.length-1;j>0;j--){const k=Math.floor(Math.random()*(j+1));[a[j],a[k]]=[a[k],a[j]]}return a}
+function mkText(it,sjt){const opts=shuffle(it.o.map((t,idx)=>({t,ok:idx===it.c})));return{kind:sjt?"sjt":"text",prompt:it.q,opts,correct:opts.findIndex(o=>o.ok),e:it.e,figOpts:false};}
+function mkListen(it){const opts=shuffle(it.o.map((t,idx)=>({t,ok:idx===it.c})));return{kind:"listen",prompt:it.q,audio:it.audio,transcript:it.audio,opts,correct:opts.findIndex(o=>o.ok),e:it.e,figOpts:false};}
+function mkAbs(it){const cs=it.opts[it.cIdx];const opts=shuffle(it.opts);return{kind:it.t==="matrix"?"matrix":"abs",seq:it.seq,cells:it.cells,opts,correct:opts.indexOf(cs),e:it.e,figOpts:true};}
+
+function buildDeck(type){mode=type;
+ if(type==="verbal")return shuffle(VERBAL.map(x=>mkText(x)));
+ if(type==="num")return shuffle(NUM.map(x=>mkText(x)));
+ if(type==="abs")return shuffle(ABS.map(mkAbs));
+ if(type==="grammar")return shuffle(GRAMMAR.map(x=>mkText(x)));
+ if(type==="sjt")return shuffle(SJT.map(x=>mkText(x,true)));
+ if(type==="listen")return shuffle(LISTEN.map(mkListen));
+ return shuffle([...shuffle(VERBAL).slice(0,4).map(x=>mkText(x)),...shuffle(NUM).slice(0,4).map(x=>mkText(x)),...shuffle(ABS).slice(0,4).map(mkAbs)]);
+}
+const NAMES={verbal:"Verbal",num:"Numérico",abs:"Abstracto",sim:"Simulacro F1",grammar:"Grammar",listen:"Listening",sjt:"Conductual"};
+
+function start(type){deck=buildDeck(type);i=0;correct=0;show("session");
+ document.getElementById("who").textContent=NAMES[type]||type;
+ const intro=document.getElementById("intro");
+ if(type==="sjt"){intro.style.display="block";intro.innerHTML=`<b>Cómo funciona la Fase 2.</b> El examen real es un cuestionario de personalidad APTO/NO APTO: respóndelo <b>entero</b> y con <b>honestidad y coherencia</b>. Esto es entrenamiento de juicio situacional para que reconozcas las competencias que valora Aena en IC03-A. Marca la opción más alineada.`;}
+ else intro.style.display="none";
+ countdown=(type==="sim");secs=0;remaining=600;startClock();render();
+}
+function startClock(){clearInterval(timer);updateClock();timer=setInterval(()=>{if(countdown){remaining--;if(remaining<=0){updateClock();return finish();}}else secs++;updateClock();},1000);}
+function updateClock(){const t=countdown?remaining:secs;const m=String(Math.floor(t/60)).padStart(2,"0"),s=String(t%60).padStart(2,"0");const el=document.getElementById("clock");el.textContent=`${m}:${s}`;el.style.color=(countdown&&remaining<=60)?"#d1495b":"";}
+
+function speak(txt){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt);u.lang="en-GB";u.rate=0.95;speechSynthesis.speak(u);}catch(e){}}
+
+function render(){answered=false;const item=deck[i];
+ document.getElementById("qnum").textContent=`Pregunta ${i+1} de ${deck.length}`;
+ document.getElementById("pfill").style.width=`${(i/deck.length)*100}%`;
+ const nx=document.getElementById("next");nx.disabled=true;nx.textContent=(i===deck.length-1)?"Ver resultado":"Siguiente";
+ const exp=document.getElementById("explain");exp.className="explain";exp.innerHTML="";
+ const body=document.getElementById("qbody"),opts=document.getElementById("opts");
+ if(item.kind==="abs"){
+   body.innerHTML=`<div class="q">¿Qué figura continúa la serie?</div><div class="figrow">${item.seq.map(f=>`<div class="fig">${fig(f)}</div>`).join("")}<div class="qmark">?</div></div>`;
+ }else if(item.kind==="matrix"){
+   body.innerHTML=`<div class="q">¿Qué figura completa la matriz?</div><div class="matrix">${item.cells.map(cc=>`<div class="mcell">${cc?fig(cc):'<span class="qmark">?</span>'}</div>`).join("")}</div>`;
+ }else if(item.kind==="listen"){
+   currentAudio=item.audio;
+   body.innerHTML=`<div class="q">${item.prompt}</div><div style="margin:12px 0"><button type="button" class="btn ghost" onclick="speak(currentAudio)">▶ Escuchar</button> <span class="note">Puedes repetir las veces que quieras.</span></div>`;
+ }else{
+   body.innerHTML=`<div class="q">${item.prompt}</div>`;
+ }
+ if(item.figOpts){opts.className="opts figs";opts.innerHTML=item.opts.map((o,idx)=>`<button class="opt figopt" onclick="answer(${idx})"><span class="k">${KEYS[idx]}</span><span class="fig">${fig(o)}</span></button>`).join("");}
+ else{opts.className="opts";opts.innerHTML=item.opts.map((o,idx)=>`<button class="opt" onclick="answer(${idx})"><span class="k">${KEYS[idx]}</span><span>${o.t}</span></button>`).join("");}
+}
+function answer(idx){if(answered)return;answered=true;const item=deck[i];
+ const btns=document.querySelectorAll("#opts .opt");btns.forEach(b=>b.setAttribute("disabled",""));
+ btns[item.correct].classList.add("correct");
+ const good=idx===item.correct;if(!good)btns[idx].classList.add("wrong");if(good)correct++;
+ const exp=document.getElementById("explain");
+ if(item.kind==="sjt"){exp.className="explain show "+(good?"good":"info");exp.innerHTML=(good?"<b>Opción más alineada.</b> ":"<b>Hay una opción más alineada.</b> ")+item.e;}
+ else{exp.className="explain show "+(good?"good":"bad");exp.innerHTML=(good?"<b>Correcto.</b> ":"<b>Incorrecto.</b> ")+item.e;if(item.kind==="listen")exp.innerHTML+=`<div style="margin-top:8px"><b>Transcripción:</b> ${item.transcript}</div>`;}
+ document.getElementById("next").disabled=false;
+}
+function next(){if(!answered)return;i++;if(i>=deck.length)finish();else render();}
+function finish(){clearInterval(timer);const total=deck.length,pct=Math.round(correct/total*100);
+ document.getElementById("rscore").textContent=`${correct}/${total}`;document.getElementById("rpct").textContent=`${pct} %`;
+ let msg;if(pct>=80)msg="Nivel de aprobado holgado. Ahora baja el tiempo por pregunta.";else if(pct>=50)msg="Vas encaminado. Repasa los fallos y repite el bloque.";else msg="Toca base: hazlo despacio leyendo cada explicación, luego repite.";
+ document.getElementById("rmsg").textContent=msg;saveBest(mode,pct);show("results");
+}
+function repeat(){start(mode);}
+function quit(){clearInterval(timer);goHome();}
+function goHome(){clearInterval(timer);clearInterval(spTimer);try{speechSynthesis.cancel();}catch(e){}show("home");loadBest();}
+function show(id){["home","session","speaking","results"].forEach(s=>document.getElementById(s).classList.toggle("hidden",s!==id));window.scrollTo(0,0);}
+
+/* Speaking */
+function openSpeaking(){show("speaking");newPrompt();resetSpeakTimer();}
+function newPrompt(){document.getElementById("sprompt").textContent=SPEAK_PROMPTS[Math.floor(Math.random()*SPEAK_PROMPTS.length)];}
+function resetSpeakTimer(){clearInterval(spTimer);spRunning=false;spLeft=120;renderSpeakClock();document.getElementById("stimerbtn").textContent="Iniciar 2 min";}
+function renderSpeakClock(){const m=String(Math.floor(spLeft/60)).padStart(2,"0"),s=String(spLeft%60).padStart(2,"0");const el=document.getElementById("sclock");el.textContent=`${m}:${s}`;el.style.color=spLeft<=15?"#d1495b":"";}
+function toggleSpeakTimer(){const b=document.getElementById("stimerbtn");if(spRunning){clearInterval(spTimer);spRunning=false;b.textContent="Reanudar";return;}spRunning=true;b.textContent="Pausar";spTimer=setInterval(()=>{spLeft--;renderSpeakClock();if(spLeft<=0){clearInterval(spTimer);spRunning=false;b.textContent="Iniciar 2 min";spLeft=120;}},1000);}
+
+/* Progreso (best-effort) */
+async function saveBest(m,pct){try{if(window.storage){const cur=await window.storage.get("best-"+m).catch(()=>null);const prev=cur?JSON.parse(cur.value):0;if(pct>prev)await window.storage.set("best-"+m,JSON.stringify(pct));}}catch(e){}loadBest();}
+async function loadBest(){const ks=["verbal","num","abs","sim","grammar","listen","sjt"];for(const k of ks){let txt="";try{if(window.storage){const r=await window.storage.get("best-"+k).catch(()=>null);if(r)txt="Mejor: "+JSON.parse(r.value)+" %";}}catch(e){}const el=document.getElementById("best-"+k);if(el)el.textContent=txt;}}
+
+(function(){const target=new Date("2026-10-03T09:00:00");document.getElementById("days").textContent=Math.max(0,Math.ceil((target-new Date())/86400000));loadBest();})();
+</script>

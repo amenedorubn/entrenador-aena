@@ -1,0 +1,19 @@
+{
+  "name": "Entrenador Aena · Niveles A-B",
+  "short_name": "Entrenador Aena",
+  "description": "Entrenador tipo Duolingo para preparar la oposición de Aena (Niveles A-B): aptitudes, competencias conductuales e inglés.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ddf4ff",
+  "theme_color": "#a5ed6e",
+  "lang": "es",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "./icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
