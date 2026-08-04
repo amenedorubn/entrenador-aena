@@ -4,7 +4,44 @@ import { generateAbstract } from "./gen-abstract.js";
 import { generateVerbal } from "./gen-verbal.js";
 import { grammarItem, translateItem, listeningItem, errorItem } from "./gen-english.js";
 import { SJT } from "../data/sjt.js";
+import { REAL, FIGURE_CATEGORIES, CATEGORY_SOURCE } from "../data/real.js";
 import { choice, shuffle } from "./rng.js";
+
+// Fuente del curso -> categorías reales que puede servir (inverso de CATEGORY_SOURCE).
+const SOURCE_CATEGORIES = {};
+for (const [cat, src] of Object.entries(CATEGORY_SOURCE)) {
+  (SOURCE_CATEGORIES[src] ??= []).push(cat);
+}
+
+// Probabilidad de que, al pedir un ítem de una fuente con banco real disponible, se
+// sirva una pregunta REAL de examen en vez de una generada por procedimiento. Ambas
+// se mezclan sin distinguir origen en el orden de la lección (ver curriculum.js).
+const REAL_CHANCE = 0.35;
+
+/**
+ * Con probabilidad REAL_CHANCE, sirve una pregunta real de examen (categoría
+ * correspondiente a `source`, nivel cercano al tier) en vez de generar una nueva.
+ * Devuelve null si no hay banco real para esa fuente o si toca generar.
+ */
+function pickReal(source, tier) {
+  const cats = SOURCE_CATEGORIES[source];
+  if (!cats || !cats.length) return null;
+  const pool = REAL.filter((r) => cats.includes(r.category));
+  if (!pool.length || Math.random() >= REAL_CHANCE) return null;
+  const near = pool.filter((r) => Math.abs(r.lvl - tier) <= 1);
+  const q = choice(near.length ? near : pool);
+  const isFigure = FIGURE_CATEGORIES.has(q.category);
+  const explanation = q.explanation?.trim().length
+    ? q.explanation
+    : `Pregunta de examen real (confianza ${q.confidence}). Fuente: ${q.sourceFile}.`;
+  return {
+    kind: isFigure ? "figure-real" : "text", block: source, tier, family: `real-${q.category}`,
+    prompt: q.prompt, image: q.image ?? null,
+    options: q.options, correctIndex: q.correctIndex, value: q.options[q.correctIndex],
+    explanation,
+    isReal: true, confidence: q.confidence, sourceFile: q.sourceFile,
+  };
+}
 
 function sjtItem(tier = 3) {
   const near = SJT.filter((x) => Math.abs(x.lvl - tier) <= 1);
@@ -37,8 +74,10 @@ export const SOURCE_LABELS = {
   grammar: "Grammar", translate: "Writing", listen: "Listening", error: "Accuracy",
 };
 
-/** Crea un ítem de la fuente indicada. */
+/** Crea un ítem de la fuente indicada (real de examen si toca, si no generado). */
 export function makeItem(source, tier) {
+  const real = pickReal(source, tier);
+  if (real) return { ...real, source };
   const fn = SOURCES[source];
   if (!fn) throw new Error(`Fuente desconocida: ${source}`);
   return { ...fn(tier), source };

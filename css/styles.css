@@ -75,6 +75,21 @@ button { font-family: inherit; cursor: pointer; }
 .hidden { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
+/* ------------------------------ Acceso ------------------------------ */
+.gate-overlay {
+  position: fixed; inset: 0; z-index: 9999; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.gate-card { width: 100%; max-width: 360px; text-align: center; }
+.gate-title { font-family: var(--font); font-weight: 800; font-size: 24px; color: var(--text-strong); margin-bottom: 4px; }
+.gate-card #gate-password {
+  width: 100%; font-family: inherit; font-weight: 800; font-size: 16px; padding: 12px 14px;
+  border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface);
+  color: var(--text); margin-top: 12px;
+}
+.gate-error { color: var(--red-dark); font-weight: 800; margin-top: 8px; }
+.gate-card .btn { margin-top: 16px; }
+
 /* ------------------------------ Botones 3D ------------------------------ */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -211,6 +226,18 @@ button { font-family: inherit; cursor: pointer; }
 .lesson-kicker { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
 .question { font-size: 22px; font-weight: 800; color: var(--text-strong); line-height: 1.3; margin-bottom: 20px; }
 .question .series { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px; }
+
+/* Ítems de examen real (isReal:true) */
+.badge-real {
+  display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--yellow-dark); background: var(--yellow-soft, #fff6d9); border: 2px solid var(--yellow);
+  border-radius: 999px; padding: 4px 10px; margin-bottom: 10px;
+}
+.figreal { margin: 16px 0; }
+.figreal img {
+  display: block; max-width: 100%; height: auto;
+  border: 2px solid var(--border); border-radius: var(--radius-lg); background: #fff;
+}
 
 .numgrid { display: grid; grid-template-columns: repeat(3, 64px); gap: 8px; margin: 16px 0; }
 .numgrid span {

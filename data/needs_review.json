@@ -1,0 +1,52 @@
+[
+ {
+  "id": "wa-aptitudes-3",
+  "lvl": 2,
+  "prompt": "¿Cuál de las siguientes palabras tiene un significado más parecido a Ejemplo?",
+  "options": [
+   "Analogía",
+   "Avenencia",
+   "Simpatía",
+   "Verbigracia"
+  ],
+  "correctIndex": 3,
+  "explanation": "Verbigracia significa literalmente 'por ejemplo'; parece más cercano a 'Ejemplo' que Analogía. Revisar.",
+  "category": "sinonimos_antonimos",
+  "difficulty": "facil",
+  "isReal": true,
+  "confidence": "baja",
+  "sourceFile": "EXAMENES AENA_opos/Aptitudes/ (foto WhatsApp, ítem 3)"
+ },
+ {
+  "id": "snl-c2-17",
+  "prompt": "Cuestionario 2, ítem 17: ¿qué número, letra o símbolo completa la serie? (ver imagen)",
+  "options": [
+   "A",
+   "B",
+   "C",
+   "D"
+  ],
+  "category": "secuencia_num_letras",
+  "sourceFile": "EXAMENES AENA_opos/fwdtestconvocatoriaaena/SECUENCIA NUMEROS LETRAS.pdf",
+  "image": "secuencia_num_letras/p6.png",
+  "answer": null,
+  "confidence": null,
+  "note": "Salto de numeración en la clave impresa del documento original (pasa del ítem 16 al 18): no hay clave para este ítem."
+ },
+ {
+  "id": "domino-c1-19",
+  "prompt": "Cuestionario 1, ítem 19: ¿qué ficha de dominó completa la serie? (ver imagen)",
+  "options": [
+   "A",
+   "B",
+   "C",
+   "D"
+  ],
+  "category": "domino",
+  "sourceFile": "EXAMENES AENA_opos/fwdtestconvocatoriaaena/DOMINO.pdf",
+  "image": "domino/p8.png",
+  "answer": null,
+  "confidence": null,
+  "note": "TEST DOMINO RESUELTO.pdf revela la ficha resultante para este ítem pero no marca la letra (a-d) correspondiente entre las opciones de DOMINO.pdf; emparejar visualmente el patrón de puntos con una opción concreta sería resolución propia, no la clave oficial. Regla dura de figuras: no servible sin marca u plantilla explícita."
+ }
+]

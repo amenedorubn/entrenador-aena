@@ -1,0 +1,160 @@
+{
+ "generated": "sesión 2026-08-03",
+ "resumen": {
+  "preguntas_reales_en_real_js": 441,
+  "needs_review_json": 44,
+  "archivos_totalmente_procesados": 10,
+  "archivos_pendientes": 9
+ },
+ "emparejamientos_confirmados": [
+  {
+   "examen": "20240317_Examen AENA.pdf",
+   "plantilla": "20240317_Examen AENA_PlantillaResultados.pdf",
+   "confianza": "alta",
+   "evidencia": "Mismo nombre base y fecha de convocatoria (8-feb-2024) citada en el texto de ambos. Verificado ítem a ítem: todas las respuestas numéricas recalculadas por mí mismo coinciden con la plantilla (36-55), y las de figuras (21-35) se tomaron directamente de la plantilla.",
+   "items": 55
+  },
+  {
+   "examen": "Fotos WhatsApp carpeta Aptitudes/",
+   "plantilla": "PLANTILLAS DE CORRECCIÓN.pdf (Convocatoria Selección Externa A/B, 24-nov-2024, Resolución 29-ene-2025)",
+   "confianza": "alta",
+   "evidencia": "Columna 'FASE 1: APTITUDES' (ítems 1-55). Verificado: ítems 54 y 55 coinciden letra por letra con las marcas a boli de la foto.",
+   "items": 53
+  },
+  {
+   "examen": "Fotos WhatsApp carpeta B1/",
+   "plantilla": "PLANTILLAS DE CORRECCIÓN.pdf",
+   "confianza": "alta",
+   "evidencia": "Columna 'INGLÉS B1' (ítems 140-199). Verificado: 6/6 ítems comprobados (155,156,157,158,159,180) coinciden con las marcas de la foto.",
+   "items": 50
+  },
+  {
+   "examen": "Fotos WhatsApp carpeta B2/",
+   "plantilla": "PLANTILLAS DE CORRECCIÓN.pdf",
+   "confianza": "alta",
+   "evidencia": "Columna 'INGLÉS B2' (ítems 1-60). Verificado: 8/9 ítems comprobados coinciden; 1 discrepancia real detectada y usada como mi propia resolución (ítem 6, needs_review).",
+   "items": 45
+  },
+  {
+   "examen": "SERIES NUMEROS.pdf",
+   "plantilla": "Soluciones SERIES DE NUMEROS.pdf",
+   "confianza": "alta",
+   "evidencia": "Mismo nombre de serie ('Series de números'), mismos 2 cuestionarios de 30 ítems, formato 'N. letra) valor' coincidente item a item.",
+   "items": 60
+  },
+  {
+   "examen": "RELOJES.pdf",
+   "plantilla": "clave propia al final del mismo PDF (páginas 12-15)",
+   "confianza": "alta",
+   "evidencia": "El propio documento incluye 'Cuestionario 1' y 'Cuestionario 2' de 20 ítems cada uno con respuesta y explicación justo después de las preguntas.",
+   "items": 40,
+   "sin_resolver_ocr": 0
+  },
+  {
+   "examen": "MATRICES FIGURAS.pdf",
+   "plantilla": "clave propia al final del mismo PDF (página 12)",
+   "confianza": "alta",
+   "evidencia": "El propio documento incluye las claves de 'Cuestionario 1' y 'Cuestionario 2' (30 ítems cada uno) en formato de letras, transcritas a mano desde la imagen porque el OCR confundía las 3 columnas.",
+   "items": 60,
+   "sin_resolver_ocr": 0
+  },
+  {
+   "examen": "FIGURAS NO RELACIONADAS.pdf",
+   "plantilla": "clave propia al final del mismo PDF (páginas 7-8)",
+   "confianza": "alta",
+   "evidencia": "El propio documento incluye clave y explicación razonada de 'Cuestionario 1' y 'Cuestionario 2'. Cada cuestionario tiene en realidad 25 ítems (no 30): los IDs fnr-c1-26..30 y fnr-c2-26..30 de la ronda anterior eran artefactos de extracción sin pregunta real detrás y se eliminaron de needs_review.json sin necesidad de resolverlos.",
+   "items": 50,
+   "sin_resolver_ocr": 0
+  },
+  {
+   "examen": "TEST SERIES FIGURAS.pdf",
+   "plantilla": "clave propia al final del mismo PDF (páginas 15-17)",
+   "confianza": "alta",
+   "evidencia": "El propio documento incluye clave y explicación razonada de 'Cuestionario 1' y 'Cuestionario 2' (30 ítems cada uno).",
+   "items": 60,
+   "sin_resolver_ocr": 0
+  },
+  {
+   "examen": "TEST ANTONIMOS SINONIMOS.pdf",
+   "plantilla": "clave propia al final del mismo PDF (página 8)",
+   "confianza": "alta",
+   "evidencia": "Diseño a 2 columnas: se volvió a renderizar cada página a imagen y se leyeron visualmente las dos columnas por separado (en vez de OCR de página completa) para reconstruir las 60 preguntas (30 sinónimos + 30 antónimos) y su clave con explicación.",
+   "items": 60,
+   "sin_resolver_ocr": 0
+  },
+  {
+   "examen": "TEST ANALOGIAS SIMPLES.pdf",
+   "plantilla": "clave propia al final del mismo PDF",
+   "confianza": "alta",
+   "evidencia": "Lectura visual página a página (no es a 2 columnas, es una fila por ítem). 59/60 ítems reconstruidos; el ítem 8 del cuestionario 2 no existe en las páginas de preguntas del documento original (salto de numeración de 7 a 9) aunque sí tiene una línea de clave — se dejó en needs_review con nota, no se inventó el enunciado.",
+   "items": 59,
+   "sin_resolver_ocr": 0
+  },
+  {
+   "examen": "TEST ANALOGIAS COMPLEJAS.pdf",
+   "plantilla": "clave propia al final del mismo PDF",
+   "confianza": "alta",
+   "evidencia": "Analogías de doble hueco (formato 'X es a ... como Y es a ...', opciones son pares de palabras). Clave con explicación para los 60 ítems (30+30), transcrita visualmente.",
+   "items": 60,
+   "sin_resolver_ocr": 0
+  },
+  {
+   "examen": "SECUENCIA NUMEROS LETRAS.pdf",
+   "plantilla": "clave propia al final del mismo PDF",
+   "confianza": "alta",
+   "evidencia": "Series de números/letras/símbolos: tratadas como tipo 'figura' con imagen de la página (igual que series_numeros), porque las opciones incluyen símbolos gráficos. 39/40 ítems con clave; el ítem 17 del cuestionario 2 no tiene línea de clave en el documento (salta de 16 a 18) y se dejó en needs_review sin inventar la respuesta.",
+   "items": 39,
+   "sin_resolver_ocr": 0
+  },
+  {
+   "examen": "DOMINO.pdf",
+   "plantilla": "TEST DOMINO RESUELTO.pdf (revela la ficha resultante directamente, con su letra, para cada ítem)",
+   "confianza": "alta",
+   "evidencia": "Inspección visual directa de las 8 páginas de TEST DOMINO RESUELTO.pdf: para cada ítem 1-20 del Cuestionario 1 de DOMINO.pdf, RESUELTO muestra la ficha de dominó correcta junto a su letra (a-d). Servibles 19/20; el ítem 19 revela la ficha resultante pero no marca la letra entre las opciones de DOMINO.pdf, y emparejar el patrón de puntos a mano sería resolución propia (regla dura de figuras) — se dejó en needs_review. Cuestionario 2 de DOMINO.pdf no tiene contrapartida en RESUELTO (que solo llega al ítem 20) y queda fuera de alcance.",
+   "items": 19,
+   "sin_resolver_ocr": 0
+  }
+ ],
+ "sin_emparejar_no_forzado": [
+  {
+   "archivo": "TEST RELOJES.pdf",
+   "motivo": "Formato distinto (5 opciones A-E, mezcla relojes+rejillas), sin clave visible en sus 4 páginas. Título indica 'son 30 preguntas, deja en blanco si no lo ves con rapidez' -> parece un cuadernillo de examen sin solucionario adjunto.",
+   "estado": "NO procesado — sin solucionario, regla dura de figuras: no servible"
+  },
+  {
+   "archivo": "CUBOS.pdf",
+   "motivo": "13 páginas, ~30 ítems (plegado/desplegado de figuras 3D). La última página son preguntas, no clave -> no se ha encontrado solucionario dentro del propio archivo.",
+   "estado": "NO procesado — sin solucionario, regla dura de figuras: no servible"
+  },
+  {
+   "archivo": "directorio_competencias_conductuales.pdf, fichas_ocupaciones_aeropuertos.pdf, info_competencias_conductuales.pdf, pruebas_seleccion_becarios_ab.pdf",
+   "motivo": "Material informativo (no son cuestionarios de preguntas). Se desencriptaron esta sesión (contraseñas obtenidas de capturas propias del usuario) y se confirmó que son fichas/directorios, no cuestionarios.",
+   "estado": "Fuera de alcance de questions.json a propósito"
+  }
+ ],
+ "sesion_2026-08-04": {
+  "resumen": {
+   "preguntas_reales_en_real_js": 710,
+   "needs_review_json": 3,
+   "items_anadidos_esta_sesion": 269,
+   "items_resueltos_de_needs_review_anterior": 32,
+   "items_eliminados_por_ser_artefactos": 10
+  },
+  "tareas_completadas": [
+   "Reprocesado a 2 columnas (imagen por columna en vez de OCR de página completa): TEST ANTONIMOS SINONIMOS.pdf (60), TEST ANALOGIAS SIMPLES.pdf (59), TEST ANALOGIAS COMPLEJAS.pdf (60), SECUENCIA NUMEROS LETRAS.pdf (39) = 218 ítems nuevos, confidence alta.",
+   "DOMINO.pdf + TEST DOMINO RESUELTO.pdf: inspección visual directa de las 8 páginas de RESUELTO (que revela la ficha correcta y su letra sin necesidad de OCR) → 19 ítems nuevos sobre 20, confidence alta.",
+   "Terminados con inspección visual de las páginas de clave: relojes-c1-8, relojes-c1-16, relojes-c2-7, relojes-c2-9, relojes-c2-12, fnr-c1-3, fnr-c1-19, fnr-c2-5, fnr-c2-21, tsf-c1-4, tsf-c1-16, tsf-c2-1 (12 ítems) y corregido series-num-c1-14 (tenía la letra mal adivinada: era 'b' 167, no 'd').",
+   "Eliminados de needs_review.json 10 ítems fantasma (fnr-c1-26..30, fnr-c2-26..30): FIGURAS NO RELACIONADAS.pdf solo tiene 25 ítems por cuestionario, no 30 — eran artefactos de un contador de extracción, sin pregunta real detrás.",
+   "engine.js ahora renderiza entre 2 y 6 opciones (antes fijo a 4) → se liberaron a real.js los 20 ítems de 5 opciones (matrices, figuras_no_relacionadas, series_figuras) que estaban aparcados en needs_review por límite de la UI.",
+   "Nuevo modo 'Competencias' (data/competencias.js + pantalla dedicada): 48 frases de autoevaluación (escala A-D) + 70 parejas de elección forzada (A/B), de conductuales1.pdf y test_competencias_conductuales.pdf. Sin corrección ni vidas/XP — el propio material indica que no hay respuesta buena o mala. Se llega desde Práctica libre.",
+   "Desencriptados los 6 PDF de fwdexmenesaena/ (contraseñas de capturas propias del usuario, nunca escritas en ningún archivo del repo).",
+   "Seguridad: EXAMENES AENA_opos/ y data/raw_extracted/ añadidos a .gitignore (material bruto con contraseñas en texto plano, nunca se debe subir). Pantalla de acceso por contraseña añadida antes de mostrar la app (hash SHA-256 en js/app.js, contraseña en texto plano en ningún archivo). service-worker.js subido a v3 para invalidar la caché de PWA con la versión antigua sin pantalla de acceso."
+  ],
+  "pendiente_para_el_futuro": [
+   "domino-c1-19, snl-c2-17, wa-aptitudes-3: en needs_review.json, sin clave fiable disponible.",
+   "CUBOS.pdf, TEST RELOJES.pdf: sin solucionario en ningún sitio; no forzar respuestas.",
+   "Cuestionario 2 de DOMINO.pdf (items propios, sin contrapartida en TEST DOMINO RESUELTO.pdf): no procesado.",
+   "Opcional (no implementado): cifrar data/real.js con la contraseña de acceso para una capa extra de protección del contenido en el repo público."
+  ]
+ }
+}

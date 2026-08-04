@@ -30,11 +30,14 @@ function assertWellFormed(it, label) {
     }
     return;
   }
-  expect(it.options, label).toHaveLength(4);
+  // Los generadores procedurales siempre dan 4 opciones; los ítems reales de examen
+  // pueden traer entre 2 y 6 (la UI las soporta todas, ver engine.js KEYS).
+  expect(it.options.length, label).toBeGreaterThanOrEqual(2);
+  expect(it.options.length, label).toBeLessThanOrEqual(6);
   const keys = it.options.map((o) => (typeof o === "object" ? JSON.stringify(o) : String(o)));
-  expect(new Set(keys).size, `${label}: opciones duplicadas → ${keys.join(" | ")}`).toBe(4);
+  expect(new Set(keys).size, `${label}: opciones duplicadas → ${keys.join(" | ")}`).toBe(it.options.length);
   expect(it.correctIndex, label).toBeGreaterThanOrEqual(0);
-  expect(it.correctIndex, label).toBeLessThanOrEqual(3);
+  expect(it.correctIndex, label).toBeLessThanOrEqual(it.options.length - 1);
   if (it.value !== undefined && typeof it.options[it.correctIndex] === "string") {
     expect(String(it.options[it.correctIndex]), label).toContain(String(it.value));
   }

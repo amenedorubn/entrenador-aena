@@ -5,7 +5,9 @@ import {
 import { buildLesson, makeItem, SOURCE_LABELS, SOURCES } from "./content.js";
 import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speak, stopSpeech } from "./engine.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
-import { choice } from "./rng.js";
+import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/competencias.js";
+import { loadReal } from "../data/real.js";
+import { choice, shuffle } from "./rng.js";
 
 /* ============================== almacenamiento ============================== */
 const K = "aena2_";
@@ -35,7 +37,7 @@ const store = {
 
 /* ============================== utilidades DOM ============================== */
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["path", "practice", "speaking", "profile", "settings", "lesson", "results"];
+const SCREENS = ["path", "practice", "speaking", "profile", "settings", "lesson", "results", "competencias"];
 const NAV_SCREENS = new Set(["path", "practice", "speaking", "profile", "settings"]);
 
 function show(name) {
@@ -337,6 +339,53 @@ function toggleSpeak() {
   }, 1000);
 }
 
+/* ============================== competencias (familiarización) ============================== */
+// Cuestionarios de personalidad reales: sin corrección, sin vidas ni XP (ver data/competencias.js).
+const comp = { kind: null, items: [], i: 0, selected: null };
+
+function startCompetencias(kind) {
+  comp.kind = kind;
+  comp.items = kind === "likert" ? shuffle(LIKERT_ITEMS) : shuffle(FORCED_CHOICE_ITEMS);
+  comp.i = 0;
+  $("comp-kicker").textContent = kind === "likert"
+    ? "Competencias · Autoevaluación (A-D)"
+    : "Competencias · Elección forzada (A/B)";
+  $("comp-done").classList.add("hidden");
+  $("comp-question").classList.remove("hidden");
+  $("comp-answer").classList.remove("hidden");
+  $("comp-foot").classList.remove("hidden");
+  show("competencias");
+  renderCompItem();
+}
+
+function renderCompItem() {
+  const item = comp.items[comp.i];
+  comp.selected = null;
+  $("comp-progress").style.width = `${(comp.i / comp.items.length) * 100}%`;
+  $("comp-question").innerHTML = `<p class="question">${item.prompt}</p>`;
+  const options = comp.kind === "likert" ? LIKERT_SCALE : item.options;
+  const next = $("comp-next-btn");
+  next.disabled = true;
+  next.textContent = comp.i === comp.items.length - 1 ? "Terminar" : "Siguiente";
+  renderOptions({ kind: "text", options }, $("comp-answer"), (i) => {
+    comp.selected = i;
+    next.disabled = i === null;
+  });
+}
+
+function nextCompItem() {
+  comp.i++;
+  if (comp.i >= comp.items.length) {
+    $("comp-question").classList.add("hidden");
+    $("comp-answer").classList.add("hidden");
+    $("comp-foot").classList.add("hidden");
+    $("comp-done").classList.remove("hidden");
+    $("comp-progress").style.width = "100%";
+    return;
+  }
+  renderCompItem();
+}
+
 /* ============================== ajustes ============================== */
 function renderSettings() {
   applyTheme();
@@ -379,6 +428,14 @@ function init() {
   document.querySelectorAll("#practice-tier button").forEach((b) =>
     b.addEventListener("click", () => { store.practiceTier = Number(b.dataset.tier); renderPractice(); }));
 
+  $("comp-start-likert").addEventListener("click", () => startCompetencias("likert"));
+  $("comp-start-forced").addEventListener("click", () => startCompetencias("forced"));
+  $("comp-next-btn").addEventListener("click", nextCompItem);
+  $("comp-quit").addEventListener("click", () => {
+    if (comp.i > 0 && comp.i < comp.items.length && !window.confirm("¿Salir? No se guarda nada porque no hay progreso que perder.")) return;
+    goto("practice");
+  });
+
   $("speak-timer").addEventListener("click", toggleSpeak);
   $("speak-new").addEventListener("click", () => { newPrompt(); resetSpeak(); });
 
@@ -402,4 +459,55 @@ function init() {
     window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
   }
 }
-document.addEventListener("DOMContentLoaded", init);
+
+/* ============================== pantalla de acceso ============================== */
+// Repo público: las preguntas reales viajan cifradas en data/real.enc.json
+// (AES-GCM-256, clave derivada por PBKDF2-SHA256 con el salt/iteraciones del propio
+// archivo — ver scripts/encrypt.mjs). La contraseña nunca se guarda ni se compara en
+// claro: si es incorrecta, el descifrado falla (el tag de autenticación de AES-GCM no
+// valida) y ese error es la señal de "contraseña incorrecta".
+function b64ToBytes(b64) {
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+async function decryptReal(password) {
+  const res = await fetch("./data/real.enc.json");
+  const { ciphertext, salt, iv, iterations } = await res.json();
+  const baseKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: b64ToBytes(salt), iterations, hash: "SHA-256" },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64ToBytes(iv) }, key, b64ToBytes(ciphertext));
+  return JSON.parse(new TextDecoder().decode(plaintext));
+}
+
+function checkGate() {
+  const overlay = $("gate-overlay");
+  const input = $("gate-password");
+  const error = $("gate-error");
+  const submit = $("gate-submit");
+  const tryUnlock = async () => {
+    if (!input.value) return;
+    submit.disabled = true;
+    error.classList.add("hidden");
+    try {
+      loadReal(await decryptReal(input.value));
+      overlay.remove();
+      init();
+    } catch {
+      error.classList.remove("hidden");
+      input.value = "";
+      input.focus();
+    } finally {
+      submit.disabled = false;
+    }
+  };
+  submit.addEventListener("click", tryUnlock);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
+  input.focus();
+}
+document.addEventListener("DOMContentLoaded", checkGate);

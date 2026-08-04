@@ -377,11 +377,69 @@ export function hardProbability(tier = 5) {
     explanation: `Complementario: P(ninguna roja) = ${b}/${n} × ${b - 1}/${n - 1} = ${frac(b * (b - 1), n * (n - 1))}. 1 − eso = <b>${v}</b>.` });
 }
 
+/* ------------------------ sembrados en problemas reales AENA ------------------------ */
+// Mismos patrones que ítems reales de convocatorias (ver data/real.js), con números
+// nuevos en cada partida — la app se "nutre" de los reales sin repetir literalmente.
+
+export function inverseWorkRate(tier = 2) {
+  const w1 = randInt(3, 15), d1 = choice([2, 4, 5, 6, 8, 10, 12, 15, 20]);
+  const total = w1 * d1;
+  let w2, guard = 0;
+  do { w2 = randInt(2, 15); guard++; } while ((w2 === w1 || total % w2 !== 0) && guard < 200);
+  if (w2 === w1 || total % w2 !== 0) w2 = total; // fallback siempre válido: total ÷ total = 1 día
+  const v = total / w2;
+  const { options, correctIndex } = buildOptions(v, () => Math.max(1, v + choice([-4, -3, -2, -1, 1, 2, 3, 4])));
+  return item({ family: "invwork", tier, prompt: `Un equipo de <b>${w1} trabajadores</b> hace un trabajo en <b>${d1} días</b>. ¿Cuántos días tardaría un equipo de <b>${w2} trabajadores</b>, al mismo ritmo cada uno?`,
+    options, correctIndex, value: v,
+    explanation: `El trabajo total es constante: ${w1}×${d1} = ${total} «trabajador-días». Con ${w2} trabajadores: ${total} ÷ ${w2} = <b>${v} días</b>.` });
+}
+
+export function directProportion(tier = 1) {
+  const perUnit = randInt(8, 90), units1 = randInt(1, 4), units2 = choice([2, 3, 4, 5, 6]);
+  const base = perUnit * units1;
+  const v = perUnit * units2;
+  const { options, correctIndex } = buildOptions(v, () => Math.max(1, v + choice([-perUnit, perUnit, -10, 10, -20, 20])));
+  return item({ family: "directprop", tier, prompt: `Un camión transporta <b>${base}</b> cajas repartidas en <b>${units1}</b> viaje${units1 > 1 ? "s" : ""} iguales. ¿Cuántas cajas transportarán <b>${units2}</b> camiones idénticos, en las mismas condiciones?`,
+    options, correctIndex, value: v,
+    explanation: `Cada camión lleva ${base} ÷ ${units1} = ${perUnit} cajas. ${units2} camiones → ${perUnit} × ${units2} = <b>${v}</b>.` });
+}
+
+export function catchUpSpeed(tier = 3) {
+  const v1 = randInt(4, 16) * 5, catchTime = randInt(1, 3), k = randInt(2, 5);
+  const headStart = (k - 1) * catchTime;
+  const dist = v1 * k * catchTime;
+  const v = v1 * k;
+  const { options, correctIndex } = buildOptions(v, () => Math.max(10, v + choice([-30, -20, -10, 10, 20, 30])), (x) => `${x} km/h`);
+  return item({ family: "catchup", tier, prompt: `Un ciclista sale a <b>${v1} km/h</b>. <b>${headStart} h</b> después, un segundo ciclista sale del mismo punto y lo alcanza al cabo de <b>${catchTime} h</b>. ¿A qué velocidad va el segundo ciclista?`,
+    options, correctIndex, value: `${v} km/h`,
+    explanation: `Cuando lo alcanza, ambos han recorrido lo mismo: ${v1} × (${headStart}+${catchTime}) = ${dist} km. El segundo lo hace en ${catchTime} h → ${dist} ÷ ${catchTime} = <b>${v} km/h</b>.` });
+}
+
+export function sequentialPassRate(tier = 3) {
+  const d1 = choice([2, 3, 4, 5]), d2 = choice([2, 3, 4, 5, 6]);
+  const total = d1 * d2 * choice([2, 3, 4, 5]);
+  const v = total / (d1 * d2);
+  const { options, correctIndex } = buildOptions(v, () => Math.max(1, Math.round(v + choice([-v * 0.5, v * 0.5, -5, 5, 10, -10]))));
+  return item({ family: "seqpass", tier, prompt: `Una oposición consta de dos pruebas: <b>1/${d1}</b> de los candidatos aprueban la primera y solo <b>1/${d2}</b> de esos aprueban también la segunda. De <b>${total}</b> candidatos, ¿cuántos son admitidos?`,
+    options, correctIndex, value: v,
+    explanation: `${total} × 1/${d1} = ${total / d1} pasan la primera. ${total / d1} × 1/${d2} = <b>${v}</b> admitidos.` });
+}
+
+export function symbolEquation(tier = 2) {
+  const k = randInt(2, 6);
+  const v = k + 1;
+  const minus = Array(k).fill("− ▲").join(" ");
+  const { options, correctIndex } = buildOptions(v, () => Math.max(1, v + choice([-2, -1, 1, 2, 3])));
+  return item({ family: "symboleq", tier, prompt: `¿Qué valor ha de tener <b>▲</b> para que se cumpla la siguiente relación?<br><b>▲ × ▲ = ■</b><br><b>■ ${minus} = ▲</b>`,
+    options, correctIndex, value: v,
+    explanation: `De la 1ª ecuación, ■ = ▲². Sustituyendo en la 2ª: ▲² − ${k}▲ = ▲ → ▲² = ${k + 1}▲ → ▲ = <b>${v}</b> (▲≠0).` });
+}
+
 /* --------------------------- registro por tier --------------------------- */
 export const NUM_FAMILIES = {
-  1: [arithSeries, simplePercent, reverseDiscount, speedTime, fractionOf],
-  2: [geomSeries, increasingDiff, chainedPercent, mixture, agesProblem, workRate],
-  3: [mulAddSeries, interleavedSeries, squaresSeries, fibonacciSeries, combinatorics, simpleProbability, averageProblem],
+  1: [arithSeries, simplePercent, reverseDiscount, speedTime, fractionOf, directProportion],
+  2: [geomSeries, increasingDiff, chainedPercent, mixture, agesProblem, workRate, inverseWorkRate, symbolEquation],
+  3: [mulAddSeries, interleavedSeries, squaresSeries, fibonacciSeries, combinatorics, simpleProbability, averageProblem, catchUpSpeed, sequentialPassRate],
   4: [primeSeries, alternatingOps, secondDiffSeries, compoundInterest, weightedAverage, twoDrawProbability, ratioSharing],
   5: [mixedRuleSeries, numericMatrix, clockAngle, multiStepWord, hardCombinatorics, hardProbability],
 };

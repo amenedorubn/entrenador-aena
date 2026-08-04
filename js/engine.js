@@ -1,7 +1,7 @@
 // Render de ítems: texto, figuras SVG, matrices, listening y banco de palabras.
 // No contiene lógica de progresión (eso vive en app.js).
 
-const KEYS = ["A", "B", "C", "D"];
+const KEYS = ["A", "B", "C", "D", "E", "F"];
 
 /* ------------------------------- figuras ------------------------------- */
 const DOT_POS = [[20, 20], [36, 20], [52, 20], [20, 36], [36, 36], [52, 36], [20, 52], [36, 52], [52, 52]];
@@ -62,20 +62,26 @@ export function fig(spec) {
 }
 
 /* ------------------------------- enunciado ------------------------------- */
+const REAL_BADGE = `<span class="badge-real" title="Pregunta tal cual apareció en una convocatoria oficial">REAL · examen oficial</span>`;
+
 export function renderQuestion(item, el, onListen) {
+  const badge = item.isReal ? REAL_BADGE : "";
   if (item.kind === "figure-series") {
-    el.innerHTML = `<p class="question">¿Qué figura continúa la serie?</p>
+    el.innerHTML = `${badge}<p class="question">¿Qué figura continúa la serie?</p>
       <div class="figrow">${item.seq.map((f) => `<div class="fig">${fig(f)}</div>`).join("")}<div class="qmark" aria-label="incógnita">?</div></div>`;
   } else if (item.kind === "matrix") {
-    el.innerHTML = `<p class="question">¿Qué figura completa la matriz?</p>
+    el.innerHTML = `${badge}<p class="question">¿Qué figura completa la matriz?</p>
       <div class="matrix">${item.cells.map((c) => `<div class="mcell">${c ? fig(c) : '<span class="qmark" aria-label="incógnita">?</span>'}</div>`).join("")}</div>`;
+  } else if (item.kind === "figure-real") {
+    el.innerHTML = `${badge}<p class="question">${item.prompt}</p>
+      <div class="figreal"><img src="./public/assets/exams/${item.image}" alt="Figura del examen real" loading="lazy"></div>`;
   } else if (item.kind === "listen") {
-    el.innerHTML = `<p class="question">${item.prompt}</p>
+    el.innerHTML = `${badge}<p class="question">${item.prompt}</p>
       <button type="button" class="btn btn--blue" id="listen-btn"><span aria-hidden="true">🔊</span> Escuchar</button>
       <p class="note" style="margin-top:8px">Puedes repetirlo las veces que quieras.</p>`;
     el.querySelector("#listen-btn")?.addEventListener("click", () => onListen(item.audio));
   } else {
-    el.innerHTML = `<p class="question">${item.prompt}</p>`;
+    el.innerHTML = `${badge}<p class="question">${item.prompt}</p>`;
   }
 }
 

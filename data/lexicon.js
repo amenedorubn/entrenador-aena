@@ -116,6 +116,35 @@ export const SYNONYMS = [
   { w: "anuente", s: "conforme", sense: "conformidad", lvl: 5 },
   { w: "larvado", s: "latente", sense: "latencia", lvl: 5 },
   { w: "menguado", s: "disminuido", sense: "disminucion", lvl: 4 },
+
+  // Semillas de exámenes reales AENA (ver data/real.js) — mismas palabras que en el
+  // examen oficial, pero aquí sirven para que synonymItem() genere infinitas variantes
+  // con distractores aleatorios nuevos en cada partida.
+  { w: "arlequín", s: "bufón", sense: "real-bufon", lvl: 2 },
+  { w: "ejemplo", s: "verbigracia", sense: "real-ejemplo", lvl: 2 },
+  { w: "periplo", s: "aventura", sense: "real-periplo", lvl: 2 },
+  { w: "almanaque", s: "calendario", sense: "real-almanaque", lvl: 3 },
+  { w: "acongojado", s: "desazonado", sense: "real-acongojado", lvl: 3 },
+  { w: "embelesar", s: "cautivar", sense: "real-embelesar", lvl: 3 },
+  { w: "ocaso", s: "puesta de sol", sense: "real-ocaso", lvl: 4 },
+  { w: "mediocre", s: "de calidad media", sense: "real-mediocre", lvl: 4 },
+  { w: "vacuo", s: "vacío de contenido", sense: "real-vacuo", lvl: 4 },
+  { w: "ligero", s: "liviano", sense: "real-ligero", lvl: 2 },
+  { w: "imperturbable", s: "impasible", sense: "real-imperturbable", lvl: 4 },
+  { w: "cauce", s: "canal", sense: "real-cauce", lvl: 2 },
+  { w: "mondadientes", s: "palillo", sense: "real-mondadientes", lvl: 4 },
+  { w: "jabato", s: "jabalí joven", sense: "real-jabato", lvl: 2 },
+  { w: "molde", s: "horma", sense: "real-molde", lvl: 2 },
+  { w: "cortijo", s: "finca", sense: "real-cortijo", lvl: 2 },
+  { w: "despiadado", s: "cruel", sense: "real-despiadado", lvl: 3 },
+  { w: "semblante", s: "cara", sense: "real-semblante", lvl: 3 },
+  { w: "somnoliento", s: "adormecido", sense: "real-somnoliento", lvl: 3 },
+  { w: "vitrificar", s: "convertir en vidrio", sense: "real-vitrificar", lvl: 4 },
+  { w: "alba", s: "primera luz del día", sense: "real-alba", lvl: 4 },
+  { w: "misantropía", s: "odio al ser humano", sense: "real-misantropia", lvl: 4 },
+  { w: "rogar", s: "pedir", sense: "real-rogar", lvl: 2 },
+  { w: "conmover", s: "ablandar", sense: "real-conmover", lvl: 2 },
+  { w: "refrescar", s: "renovar", sense: "real-refrescar", lvl: 3 },
 ];
 
 export const ANTONYMS = [
@@ -159,6 +188,14 @@ export const ANTONYMS = [
   { w: "mendaz", a: "veraz", sense: "veracidad", lvl: 3 },
   { w: "sempiterno", a: "fugaz", sense: "perdurabilidad", lvl: 4 },
   { w: "ingente", a: "ínfimo", sense: "escala", lvl: 4 },
+
+  // Semillas de exámenes reales AENA (ver data/real.js).
+  { w: "asenso", a: "negar", sense: "real-asenso", lvl: 2 },
+  { w: "lisonjero", a: "molesto", sense: "real-lisonjero", lvl: 3 },
+  { w: "azuzar", a: "refrenar", sense: "real-azuzar", lvl: 2 },
+  { w: "alzar", a: "descender", sense: "real-alzar", lvl: 2 },
+  { w: "meta", a: "inicio", sense: "real-meta", lvl: 2 },
+  { w: "audaz", a: "cobarde", sense: "real-audaz", lvl: 2 },
 ];
 
 // Analogías agrupadas por relación. Se genera A:B :: C:? tomando dos pares de la MISMA
@@ -176,6 +213,11 @@ export const ANALOGY_RELATIONS = [
   { rel: "fobia-miedo", lvl: 4, pairs: [["claustrofobia", "espacios cerrados"], ["acrofobia", "alturas"], ["aracnofobia", "arañas"], ["agorafobia", "espacios abiertos"], ["hidrofobia", "agua"]] },
   { rel: "material-producto", lvl: 2, pairs: [["harina", "pan"], ["uva", "vino"], ["leche", "queso"], ["arcilla", "ladrillo"], ["algodón", "tela"], ["aceituna", "aceite"]] },
   { rel: "gobierno-de", lvl: 4, pairs: [["monarquía", "un rey"], ["oligarquía", "unos pocos"], ["democracia", "el pueblo"], ["teocracia", "el clero"], ["plutocracia", "los ricos"], ["tecnocracia", "los técnicos"]] },
+
+  // Semillas de exámenes reales AENA (ver data/real.js): mismos pares que en el examen,
+  // agrupados por relación para que analogyItem() los combine con distractores nuevos.
+  { rel: "sinónimo-culto", lvl: 4, pairs: [["apaciguar", "tranquilizar"], ["rechazar", "repeler"], ["acopio", "provisión"], ["estridente", "llamativo"], ["nocivo", "perjudicial"], ["inocuo", "inofensivo"]] },
+  { rel: "antónimo-culto", lvl: 4, pairs: [["competente", "inexperto"], ["hábil", "torpe"], ["avalar", "desacreditar"], ["farsante", "veraz"]] },
 ];
 
 // Categorías para "palabra intrusa". Deben ser DISJUNTAS entre sí (verificado por tests).

@@ -1,3 +1,15 @@
 node_modules/
 .DS_Store
 Thumbs.db
+
+# Material fuente bruto: PDFs originales, fotos WhatsApp y capturas con
+# contraseñas de acceso en texto plano. Nunca debe llegar a un repo público.
+# Lo que sirve la app vive en public/assets/exams/ (páginas ya recortadas,
+# sin contraseñas) y en data/*.js — esos SÍ se versionan.
+EXAMENES AENA_opos/
+data/raw_extracted/
+
+# Preguntas reales en texto plano: solo vive en local. Lo que se sube es
+# data/real.enc.json (cifrado con AES-GCM, ver scripts/encrypt.mjs).
+data/real.source.js
+data/real.plain.json

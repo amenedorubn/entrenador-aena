@@ -16,6 +16,17 @@
 </head>
 <body>
 
+<!-- ============================ ACCESO ============================ -->
+<div id="gate-overlay" class="gate-overlay">
+  <div class="gate-card">
+    <h1 class="gate-title">Acceso privado</h1>
+    <p class="note">Introduce la contraseña para entrar.</p>
+    <input type="password" id="gate-password" autocomplete="current-password" placeholder="Contraseña" aria-label="Contraseña">
+    <p class="gate-error hidden" id="gate-error" role="alert">Contraseña incorrecta.</p>
+    <button type="button" class="btn btn--green btn--wide" id="gate-submit">Entrar</button>
+  </div>
+</div>
+
 <!-- ============================ CAMINO ============================ -->
 <section id="screen-path" class="screen active">
   <header class="topbar">
@@ -51,7 +62,38 @@
       <div class="card__title">Bloque</div>
       <div class="progress-list" id="practice-blocks"></div>
     </div>
+
+    <div class="card">
+      <div class="card__title">Competencias (familiarización)</div>
+      <p class="note">Cuestionarios reales de personalidad de la fase de competencias conductuales. El propio material indica que no hay respuesta correcta: sirven solo para conocer el formato. No usan vidas ni dan XP.</p>
+      <div style="display:grid;gap:10px;margin-top:10px">
+        <button type="button" class="btn btn--ghost btn--wide" id="comp-start-likert">Autoevaluación · 48 frases (escala A–D)</button>
+        <button type="button" class="btn btn--ghost btn--wide" id="comp-start-forced">Elección forzada · 70 parejas (A/B)</button>
+      </div>
+    </div>
   </main>
+</section>
+
+<!-- ============================ COMPETENCIAS ============================ -->
+<section id="screen-competencias" class="screen">
+  <div class="lesson-head">
+    <button type="button" class="icon-btn" id="comp-quit" aria-label="Salir de competencias">✕</button>
+    <div class="progressbar"><div class="progressbar__fill" id="comp-progress"></div></div>
+  </div>
+  <main class="lesson-body">
+    <p class="lesson-kicker" id="comp-kicker"></p>
+    <div id="comp-question"></div>
+    <div id="comp-answer"></div>
+    <div id="comp-done" class="hidden">
+      <p class="question">Cuestionario completado.</p>
+      <p class="note">Esto era solo familiarización: no hay aciertos ni fallos que registrar.</p>
+    </div>
+  </main>
+  <div class="sticky-foot" id="comp-foot">
+    <div class="sticky-foot__inner">
+      <button type="button" class="btn btn--green btn--wide" id="comp-next-btn" disabled>Siguiente</button>
+    </div>
+  </div>
 </section>
 
 <!-- ============================ SPEAKING ============================ -->
