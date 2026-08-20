@@ -165,8 +165,24 @@ function beginSession(kicker) {
   renderCurrentItem();
 }
 
+// Blindaje: un ítem "figure-real"/requiresAsset sin imagen resoluble nunca debería
+// llegar aquí (content.js ya filtra status:"revision" del pool), pero si lo hace -por
+// datos editados a mano tras el cifrado, por ejemplo- no se pinta: se sustituye por un
+// ítem nuevo de la misma fuente/nivel y se avisa por consola. Tope de reintentos para
+// no colgarse si una fuente entera queda sin ítems servibles.
+function ensureRenderable(item) {
+  let candidate = item;
+  let guard = 0;
+  while (candidate.kind === "figure-real" && !candidate.image && guard++ < 5) {
+    console.warn(`[real] Ítem sin asset válido, se descarta: "${candidate.prompt?.slice(0, 80)}"`);
+    candidate = makeItem(candidate.source, candidate.tier);
+  }
+  return candidate;
+}
+
 function renderCurrentItem() {
-  const item = session.items[session.i];
+  const item = ensureRenderable(session.items[session.i]);
+  session.items[session.i] = item;
   session.selection = null;
   session.answered = false;
 

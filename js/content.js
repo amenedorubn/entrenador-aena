@@ -26,17 +26,23 @@ const REAL_CHANCE = 0.35;
 function pickReal(source, tier) {
   const cats = SOURCE_CATEGORIES[source];
   if (!cats || !cats.length) return null;
-  const pool = REAL.filter((r) => cats.includes(r.category));
+  // status: "revision" = ítem marcado por scripts/validate-questions.mjs (respuesta
+  // dudosa, gráfico citado sin imagen válida, etc.) — nunca se sirve, pero se conserva
+  // en real.source.js para no perder el trabajo de extracción. Ver reports/questions-audit.md.
+  const pool = REAL.filter((r) => cats.includes(r.category) && r.status !== "revision");
   if (!pool.length || Math.random() >= REAL_CHANCE) return null;
   const near = pool.filter((r) => Math.abs(r.lvl - tier) <= 1);
   const q = choice(near.length ? near : pool);
-  const isFigure = FIGURE_CATEGORIES.has(q.category);
+  // Una pregunta es "figura" si su categoría lo es por defecto (matrices, dominó...) o si
+  // trae imagen propia aunque su categoría no esté en FIGURE_CATEGORIES (p. ej. las
+  // preguntas numéricas que citan un gráfico de barras, o secuencia_num_letras).
+  const isFigure = FIGURE_CATEGORIES.has(q.category) || Boolean(q.image);
   const explanation = q.explanation?.trim().length
     ? q.explanation
     : `Pregunta de examen real (confianza ${q.confidence}). Fuente: ${q.sourceFile}.`;
   return {
     kind: isFigure ? "figure-real" : "text", block: source, tier, family: `real-${q.category}`,
-    prompt: q.prompt, image: q.image ?? null,
+    prompt: q.prompt, image: q.image ?? null, requiresAsset: Boolean(q.requiresAsset),
     options: q.options, correctIndex: q.correctIndex, value: q.options[q.correctIndex],
     explanation,
     isReal: true, confidence: q.confidence, sourceFile: q.sourceFile,
