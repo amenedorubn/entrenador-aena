@@ -10,6 +10,12 @@
 //       (campo `image` ausente o archivo inexistente en public/assets/exams/) -> requiresAsset
 //   (f) referencias a imágenes rotas en general (aunque no citen gráfico en el prompt)
 //   (g) posibles imágenes cruzadas: el asset no pertenece a la carpeta esperada para su sourceFile
+//   (h) dependencia implícita de datos externos sin palabra-gancho tipo "gráfico/tabla/figura"
+//       (señal blanda: "se entrevistaron a N", "sobre el porcentaje", "puede afirmarse
+//       que", categorías entre paréntesis separadas por "/" o "x"... — se reporta para
+//       revisión semántica manual, no se auto-marca revision)
+//   (i) duplicados por firma normalizada de prompt (+ imagen, para no confundir el
+//       prompt genérico de las preguntas de figura con un duplicado real)
 //
 // Uso: node scripts/validate-questions.mjs
 // Salida: reports/questions-audit.md + resumen por stdout. Exit code 0 siempre
@@ -145,8 +151,51 @@ function numberInOptions(options, value, tolerance = 0.5) {
   });
 }
 
+// Registro manual de trabajo de recuperación/auditoría hecho a mano en cada ronda (no
+// se puede derivar solo de REAL en el momento de correr el script). Añade una entrada
+// nueva arriba cada vez que recuperes imágenes, resuelvas needs_review, etc. — si no,
+// la siguiente ejecución de este script pisa cualquier nota que hubieras escrito a mano
+// directamente en el .md.
+const SESSION_LOG = [
+  {
+    date: "2026-08-20 (ronda 2)",
+    notes: [
+      "Detector requiresAsset ampliado con patrones de dependencia implícita (ver (h) más abajo) — cubre el caso que se escapó: wa-aptitudes-42 (\"Se entrevistaron a 200 ancianos...\") no usa ninguna palabra tipo gráfico/tabla/figura.",
+      "Pasada semántica manual sobre las 40 preguntas de razonamiento_numerico (única categoría con riesgo real de dependencia oculta: verbal/inglés son autocontenidas por construcción, y las categorías de figura ya exigen imagen). Resultado: 40/40 resueltas — o bien autocontenidas, o bien con gráfico recuperado.",
+      "Bloque recuperado con imagen nueva (recortada de la foto original y verificada visualmente contra la clave): wa-aptitudes-21/22 (imagen que tenía asignada antes NO era la suya — mostraba la página de los ítems 50-53; corregida), wa-aptitudes-42, wa-aptitudes-49, wa-aptitudes-53, wa-aptitudes-55. Los 3 últimos salen de needs_review/status:\"revision\" de la ronda anterior.",
+      "Excluidos permanentemente (sin fuente recuperable): ninguno nuevo esta ronda — los 3 que estaban en revision se recuperaron todos.",
+      "(h) marca ex20240317-38 (ciclista, +5km/día) por \"de los siguientes\" — falso positivo revisado a mano: es una progresión aritmética autocontenida (10 + 5×13 = 75km, opción D), no depende de ningún gráfico. Queda en el pool.",
+      "Bug de repetición dentro de una misma lección: content.js elegía cada ítem con Math.random() independiente por pregunta, sin memoria de lo ya servido -> podía repetir el mismo id real o la misma pregunta generada dos veces en una lección. Fix: buildLesson/makeItem ahora reciben una `session` (ids reales ya usados + firmas normalizadas ya usadas) y consumen cada bloque de REAL barajado una vez (Fisher-Yates) sin reemplazo; los generadores reintentan hasta 10 veces ante colisión de firma y si no, se descarta esa pregunta y la lección se acorta en vez de repetir.",
+      "Añadido check (i) al validador: 0 duplicados reales en las 710 preguntas (una comprobación ingenua solo por texto daba 60 falsos positivos en categorías de figura, resueltos incluyendo `image` en la firma).",
+    ],
+  },
+];
+
+/* ------------------------------- (i) duplicados de todo el banco ------------------------------- */
+function normalizeSignature(text) {
+  return text
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 /* ------------------------------- recorrido principal ------------------------------- */
-const findings = { outOfRange: [], dupOptions: [], arithmeticMismatch: [], truncated: [], missingAsset: [], brokenImage: [], crossedImage: [] };
+const findings = { outOfRange: [], dupOptions: [], arithmeticMismatch: [], truncated: [], missingAsset: [], brokenImage: [], crossedImage: [], implicitDependency: [] };
+// Duplicados por firma normalizada del prompt. Incluye el campo `image` en la firma:
+// las preguntas de figura comparten prompt genérico ("¿Qué figura completa...") y lo
+// que las distingue de verdad es la imagen, así que sin esto casi todas las preguntas
+// de matrices/relojes/figuras_no_relacionadas/test_series_figuras (mismo prompt
+// genérico, imagen distinta) saldrían como falsos positivos.
+const bySignature = new Map();
+for (const it of REAL) {
+  const sig = normalizeSignature(it.prompt) + "|" + (it.image ?? "");
+  if (!bySignature.has(sig)) bySignature.set(sig, []);
+  bySignature.get(sig).push(it);
+}
+const CONFIDENCE_RANK = { alta: 2, media: 1, baja: 0 };
+const duplicateGroups = [...bySignature.values()].filter((g) => g.length > 1);
 const byCategory = {};
 
 for (const it of REAL) {
@@ -188,13 +237,25 @@ for (const it of REAL) {
   // "cuadro" se restringe a la acepción "tabla/gráfico" (p. ej. "el cuadro siguiente");
   // en este banco "cuadro"/"cuadros" aparece siempre como "pintura" (obras de arte,
   // museo, precio de catálogo) y generaba falsos positivos si se matcheaba en bruto.
+  //
+  // IMPLICIT_DEPENDENCY amplía la red a enunciados que dependen de datos externos SIN
+  // usar ninguna de las palabras de citesGraphic (el caso que se escapó la ronda
+  // anterior: "Se entrevistaron a 200 ancianos... ¿cuántos NO ven documentales?" no
+  // dice "gráfico" en ningún sitio). Es una señal blanda -> no basta con no tener
+  // imagen para marcar revision automáticamente (dispara en problemas de porcentajes
+  // 100% autocontenidos), así que se reporta aparte en (h) para revisión semántica,
+  // no se mezcla con (e).
   const citesGraphic = /gráfic|tabla|figura|imagen|dibujo|serie siguiente|cuadro (siguiente|adjunto|de doble entrada)/i.test(it.prompt);
+  const IMPLICIT_DEPENDENCY = /se entrevistaron a \d|de los \d+ (?:que|encuestados|entrevistados)|sobre el porcentaje|según los datos|según los resultados|en la muestra|puede afirmarse que|de los siguientes|\([^)]*\/[^)]*\)|\([^)]*\bx\b[^)]*\)/i;
+  const impliesExternalData = IMPLICIT_DEPENDENCY.test(it.prompt);
   const hasImageField = !!it.image;
   const imageExists = hasImageField && diskAssets.has(it.image);
   if (citesGraphic && (!hasImageField || !imageExists)) {
     findings.missingAsset.push({ ...it, reason: !hasImageField ? "sin campo image" : "archivo no existe" });
   } else if (hasImageField && !imageExists) {
     findings.brokenImage.push(it);
+  } else if (!citesGraphic && impliesExternalData && !hasImageField) {
+    findings.implicitDependency.push(it);
   }
 
   // (g): cruce de imagen — la carpeta del asset no encaja con el sourceFile del ítem
@@ -232,6 +293,12 @@ if (stillPending.length) {
 }
 md += `\n_(f) y (g) parten de ${diskAssets.size} assets encontrados en public/assets/exams/._\n`;
 
+md += `\n## Registro de sesiones (trabajo manual, no derivable de REAL)\n`;
+for (const entry of SESSION_LOG) {
+  md += `\n### ${entry.date}\n\n`;
+  for (const note of entry.notes) md += `- ${note}\n`;
+}
+
 md += section("(a) correctIndex fuera de rango", findings.outOfRange,
   (it) => `- \`${it.id}\`: correctIndex=${it.correctIndex}, ${it.options.length} opciones — "${it.prompt.slice(0, 80)}..."`);
 
@@ -253,6 +320,19 @@ md += section("(f) imagen rota (no cita gráfico en el prompt, pero el archivo n
 md += section("(g) posible imagen cruzada (carpeta del asset no encaja con sourceFile)", findings.crossedImage,
   (it) => `- \`${it.id}\`: image="${it.image}" (carpeta "${it.folder}") — sourceFile="${it.sourceFile}"`);
 
+md += section("(h) posible dependencia de datos externos sin palabra-gancho (señal blanda, revisar a mano)", findings.implicitDependency,
+  (it) => `- \`${it.id}\` [${it.category}]: "${it.prompt.slice(0, 110)}..."`);
+
+md += `\n## (i) duplicados por firma normalizada de prompt (${duplicateGroups.length} grupos)\n\n`;
+md += duplicateGroups.length
+  ? "Se conserva el de mayor confidence de cada grupo; el resto se marcaría `status: \"revision\"`.\n\n" +
+    duplicateGroups.map((g) => {
+      const sorted = [...g].sort((a, b) => (CONFIDENCE_RANK[b.confidence] ?? -1) - (CONFIDENCE_RANK[a.confidence] ?? -1));
+      const [keep, ...rest] = sorted;
+      return `- conserva \`${keep.id}\` (${keep.confidence}) — descarta ${rest.map((r) => `\`${r.id}\` (${r.confidence})`).join(", ")}`;
+    }).join("\n") + "\n"
+  : "Ninguno. (Nota: una comprobación ingenua solo por texto de prompt da 60 falsos positivos en categorías de figura — matrices/relojes/figuras_no_relacionadas/test_series_figuras comparten prompt genérico \"¿Qué figura completa...?\" pero cada una trae una imagen distinta. La firma real incluye el campo `image` precisamente para no confundir eso con un duplicado.)\n";
+
 md += `\n## Ítems fuera del pool por categoría\n\n`;
 md += `| categoría | total | en revisión |\n|---|---|---|\n`;
 for (const [cat, n] of Object.entries(byCategory).sort()) md += `| ${cat} | ${n.total} | ${n.revision} |\n`;
@@ -268,4 +348,6 @@ console.log(`  (d) prompts truncados: ${findings.truncated.length}`);
 console.log(`  (e) gráfico sin asset válido: ${findings.missingAsset.length}`);
 console.log(`  (f) imagen rota: ${findings.brokenImage.length}`);
 console.log(`  (g) posible imagen cruzada: ${findings.crossedImage.length}`);
+console.log(`  (h) dependencia implícita (señal blanda): ${findings.implicitDependency.length}`);
+console.log(`  (i) grupos duplicados: ${duplicateGroups.length}`);
 console.log(`  total propuesto para revision: ${revisionIds.size}`);
