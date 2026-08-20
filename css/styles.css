@@ -62,7 +62,10 @@
 @media (prefers-reduced-motion: reduce) { :root { --motion: 0ms; } }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; padding: 0; height: 100%; }
+/* overflow-x:hidden es el cinturón de seguridad: si algún elemento fixed/flex se
+   pasa del ancho del viewport (como el .bottomnav de más abajo), esto evita que
+   aparezca scroll horizontal / que el navegador deje hacer zoom-out para verlo. */
+html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; }
 
 body {
   background: var(--bg);
@@ -226,13 +229,17 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--bg); border-top: 2px solid var(--border);
   padding-bottom: env(safe-area-inset-bottom); /* home indicator / nav por gestos */
 }
-.bottomnav__inner { display: flex; max-width: var(--max-w); margin: 0 auto; }
+.bottomnav__inner { display: flex; width: 100%; max-width: var(--max-w); margin: 0 auto; }
+/* min-width:0 es el fix real: sin él, un flex item nunca se encoge por debajo del
+   ancho de su contenido (aquí, la etiqueta en mayúsculas tipo "PRÁCTICA"/"PROGRESO"),
+   así que en pantallas estrechas el conjunto de 5 botones se salía del viewport por
+   la derecha -> scroll horizontal y el navegador habilitando zoom para "verlo todo". */
 .navbtn {
-  flex: 1; min-height: 56px; background: none; border: none;
-  display: grid; place-items: center; gap: 2px; padding: 6px 0;
+  flex: 1; min-width: 0; min-height: 56px; background: none; border: none;
+  display: grid; place-items: center; gap: 2px; padding: 6px 2px;
   font-size: 24px; border-radius: var(--radius); border: 2px solid transparent;
 }
-.navbtn__label { font-size: 10px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.navbtn__label { font-size: 10px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere; text-align: center; }
 .navbtn[aria-current="page"] { border-color: var(--blue); background: var(--blue-soft); }
 .navbtn[aria-current="page"] .navbtn__label { color: var(--blue); }
 
