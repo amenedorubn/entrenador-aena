@@ -152,7 +152,7 @@ function startLesson(index) {
 function startPractice(source, tier) {
   session.lessonIndex = null;
   session.practice = { source, tier };
-  session.items = Array.from({ length: QUESTIONS_PER_LESSON }, () => makeItem(source, tier));
+  session.items = buildLesson([source], tier, QUESTIONS_PER_LESSON);
   beginSession(`Práctica libre · ${SOURCE_LABELS[source]} · nivel ${tier}`);
 }
 
