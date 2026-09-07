@@ -2,7 +2,7 @@ import {
   WORLDS, LESSONS, PASS_THRESHOLD, QUESTIONS_PER_LESSON, HEARTS,
   isPassed, lessonState, currentLessonIndex, unitProgress, worldProgress, worldUnlocked, totalPassed,
 } from "./curriculum.js";
-import { buildLesson, makeItem, SOURCE_LABELS, SOURCES } from "./content.js";
+import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES } from "./content.js";
 import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speak, stopSpeech, optionText } from "./engine.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
 import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/competencias.js";
@@ -34,6 +34,11 @@ const store = {
   set examDate(v) { set("examDate", v); },
   get practiceTier() { return get("practiceTier", 3); },
   set practiceTier(v) { set("practiceTier", v); },
+  // Ids de preguntas REALES falladas la última vez que se sirvieron, para "Repasar
+  // fallos". Se quita un id en cuanto se responde bien (refleja lo que sigue
+  // pendiente, no un historial de todo lo que alguna vez se falló).
+  get missedIds() { return get("missedIds", []); },
+  set missedIds(v) { set("missedIds", v); },
 };
 
 /* ============================== utilidades DOM ============================== */
@@ -139,13 +144,14 @@ function renderPath() {
 /* ============================== sesión de lección ============================== */
 const session = {
   items: [], i: 0, correct: 0, hearts: HEARTS,
-  lessonIndex: null, practice: null, selection: null, answered: false,
+  lessonIndex: null, practice: null, review: false, selection: null, answered: false,
 };
 
 function startLesson(index) {
   const l = LESSONS[index];
   session.lessonIndex = index;
   session.practice = null;
+  session.review = false;
   session.items = buildLesson(l.sources, l.tier, QUESTIONS_PER_LESSON);
   beginSession(`Mundo ${l.worldIndex + 1} · Unidad ${l.unitIndex + 1} · Lección ${l.lessonIndex + 1}`);
 }
@@ -153,13 +159,27 @@ function startLesson(index) {
 function startPractice(source, tier) {
   session.lessonIndex = null;
   session.practice = { source, tier };
+  session.review = false;
   session.items = buildLesson([source], tier, QUESTIONS_PER_LESSON);
   beginSession(`Práctica libre · ${SOURCE_LABELS[source]} · nivel ${tier}`);
 }
 
+/** Repasa exactamente las preguntas reales falladas la última vez (store.missedIds),
+ *  sin límite de vidas -- el objetivo es verlas todas, no acertar una racha. */
+function startReview() {
+  const ids = store.missedIds;
+  if (!ids.length) return;
+  session.lessonIndex = null;
+  session.practice = null;
+  session.review = true;
+  session.items = buildReviewLesson(ids);
+  const n = session.items.length;
+  beginSession(`Repasar fallos · ${n} pregunta${n === 1 ? "" : "s"}`);
+}
+
 function beginSession(kicker) {
   session.i = 0; session.correct = 0;
-  session.hearts = store.heartsOn && session.practice === null ? HEARTS : Infinity;
+  session.hearts = store.heartsOn && session.practice === null && !session.review ? HEARTS : Infinity;
   $("lesson-kicker").textContent = kicker;
   $("lesson-hearts").classList.toggle("hidden", session.hearts === Infinity);
   show("lesson");
@@ -230,6 +250,16 @@ function evaluate() {
   else if (session.hearts !== Infinity) session.hearts = Math.max(0, session.hearts - 1);
   $("hearts-count").textContent = session.hearts;
 
+  // Solo las preguntas reales tienen id estable entre sesiones (las generadas se
+  // recrean cada vez, no hay "la misma" que repasar). Se guarda mientras se siga
+  // fallando; se quita en cuanto se acierta -- la lista es "lo que sigue pendiente".
+  if (item.isReal && item.id) {
+    const missed = store.missedIds;
+    const idx = missed.indexOf(item.id);
+    if (!good && idx === -1) { missed.push(item.id); store.missedIds = missed; }
+    else if (good && idx !== -1) { missed.splice(idx, 1); store.missedIds = missed; }
+  }
+
   const fb = $("feedback");
   const isSjt = item.kind === "sjt";
   fb.classList.add("show", good ? "good" : "bad");
@@ -286,19 +316,27 @@ function finish() {
     if (pct > (prog[key] ?? 0)) { prog[key] = pct; store.progress = prog; }
   }
 
+  const stillMissed = session.review ? store.missedIds.length : null;
+
   $("results-spark").textContent = ranOut ? "💔" : passed ? (pct === 100 ? "🌟" : "🎉") : "💪";
-  $("results-title").textContent = ranOut
-    ? "Te has quedado sin vidas"
-    : pct === 100 ? "¡Perfecto!" : passed ? "¡Lección superada!" : "Casi";
-  $("results-sub").textContent = ranOut
-    ? "Repite la lección: los fallos se explican uno a uno."
-    : passed
-      ? (session.lessonIndex !== null ? "Has desbloqueado la siguiente lección." : "Buen trabajo. Sigue practicando.")
-      : `Necesitas un ${PASS_THRESHOLD * 100} % para superar la lección. Repasa las explicaciones y repite.`;
+  $("results-title").textContent = session.review
+    ? (stillMissed === 0 ? "¡Repaso completo!" : "Repaso terminado")
+    : ranOut
+      ? "Te has quedado sin vidas"
+      : pct === 100 ? "¡Perfecto!" : passed ? "¡Lección superada!" : "Casi";
+  $("results-sub").textContent = session.review
+    ? (stillMissed === 0
+        ? "Ya no te queda ninguna pregunta pendiente de repasar."
+        : `Te quedan ${stillMissed} pregunta${stillMissed === 1 ? "" : "s"} por dominar. Repite el repaso cuando quieras.`)
+    : ranOut
+      ? "Repite la lección: los fallos se explican uno a uno."
+      : passed
+        ? (session.lessonIndex !== null ? "Has desbloqueado la siguiente lección." : "Buen trabajo. Sigue practicando.")
+        : `Necesitas un ${PASS_THRESHOLD * 100} % para superar la lección. Repasa las explicaciones y repite.`;
   $("results-xp").textContent = `+${xpGain}`;
   $("results-acc").textContent = `${pct} %`;
   $("results-acc-badge").className = `badge ${passed ? "badge--acc" : "badge--fail"}`;
-  $("results-repeat").classList.toggle("hidden", false);
+  $("results-repeat").classList.toggle("hidden", stillMissed === 0);
   show("results");
 }
 
@@ -328,6 +366,12 @@ function renderProfile() {
   $("p-xp").textContent = store.xp;
   $("p-lessons").textContent = `${totalPassed(progress)}/${LESSONS.length}`;
   $("p-days").textContent = daysLeft();
+
+  const missed = store.missedIds.length;
+  $("p-review-count").textContent = missed
+    ? `${missed} pregunta${missed === 1 ? "" : "s"} real${missed === 1 ? "" : "es"} pendiente${missed === 1 ? "" : "s"} de repasar`
+    : "Ninguna pregunta pendiente de repasar. Sigue practicando y las que falles aparecerán aquí.";
+  $("p-review-btn").disabled = missed === 0;
   $("p-worlds").innerHTML = WORLDS.map((w, i) => {
     const wp = worldProgress(progress, w.id);
     const pct = Math.round((wp.lessonsDone / wp.lessonsTotal) * 100);
@@ -432,6 +476,8 @@ function init() {
   document.querySelectorAll(".navbtn").forEach((b) =>
     b.addEventListener("click", () => goto(b.dataset.nav)));
 
+  $("p-review-btn").addEventListener("click", startReview);
+
   $("check-btn").addEventListener("click", evaluate);
   $("feedback-next").addEventListener("click", nextItem);
   $("lesson-quit").addEventListener("click", () => {
@@ -443,6 +489,7 @@ function init() {
   $("results-continue").addEventListener("click", () => goto("path"));
   $("results-repeat").addEventListener("click", () => {
     if (session.lessonIndex !== null) startLesson(session.lessonIndex);
+    else if (session.review) startReview();
     else startPractice(session.practice.source, session.practice.tier);
   });
 

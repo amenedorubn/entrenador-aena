@@ -67,6 +67,23 @@ function buildRealQueue(cats, tier) {
  * ya servido en la misma lección. Devuelve null si no hay banco real para esa fuente,
  * si toca generar, o si la cola de esta fuente ya se agotó en esta lección.
  */
+// Una pregunta es "figura" si su categoría lo es por defecto (matrices, dominó...) o si
+// trae imagen propia aunque su categoría no esté en FIGURE_CATEGORIES (p. ej. las
+// preguntas numéricas que citan un gráfico de barras, o secuencia_num_letras).
+function toRealItem(q, source, tier) {
+  const isFigure = FIGURE_CATEGORIES.has(q.category) || Boolean(q.image);
+  const explanation = q.explanation?.trim().length
+    ? q.explanation
+    : `Pregunta de examen real (confianza ${q.confidence}). Fuente: ${q.sourceFile}.`;
+  return {
+    id: q.id, kind: isFigure ? "figure-real" : "text", block: source, source, tier, family: `real-${q.category}`,
+    prompt: q.prompt, image: q.image ?? null, requiresAsset: Boolean(q.requiresAsset),
+    options: q.options, correctIndex: q.correctIndex, value: q.options[q.correctIndex],
+    explanation,
+    isReal: true, confidence: q.confidence, sourceFile: q.sourceFile,
+  };
+}
+
 function pickReal(source, tier, dedupe) {
   const cats = SOURCE_CATEGORIES[source];
   if (!cats || !cats.length) return null;
@@ -81,20 +98,20 @@ function pickReal(source, tier, dedupe) {
   if (!q) return null; // pool agotado para esta fuente en esta lección -> toca generar
 
   dedupe.usedIds.add(q.id);
-  // Una pregunta es "figura" si su categoría lo es por defecto (matrices, dominó...) o si
-  // trae imagen propia aunque su categoría no esté en FIGURE_CATEGORIES (p. ej. las
-  // preguntas numéricas que citan un gráfico de barras, o secuencia_num_letras).
-  const isFigure = FIGURE_CATEGORIES.has(q.category) || Boolean(q.image);
-  const explanation = q.explanation?.trim().length
-    ? q.explanation
-    : `Pregunta de examen real (confianza ${q.confidence}). Fuente: ${q.sourceFile}.`;
-  return {
-    id: q.id, kind: isFigure ? "figure-real" : "text", block: source, tier, family: `real-${q.category}`,
-    prompt: q.prompt, image: q.image ?? null, requiresAsset: Boolean(q.requiresAsset),
-    options: q.options, correctIndex: q.correctIndex, value: q.options[q.correctIndex],
-    explanation,
-    isReal: true, confidence: q.confidence, sourceFile: q.sourceFile,
-  };
+  return toRealItem(q, source, tier);
+}
+
+/**
+ * Construye una sesión de práctica solo con las preguntas reales cuyo id está en
+ * `ids` (típicamente store.missedIds: las falladas la última vez que se sirvieron).
+ * No aplica REAL_CHANCE ni deduplicación por lección -- se quiere repasar EXACTAMENTE
+ * esas, todas. Descarta silenciosamente cualquier id que ya no exista en REAL (banco
+ * editado) o que esté en status:"revision" (no servible). Orden barajado.
+ */
+export function buildReviewLesson(ids) {
+  const wanted = new Set(ids);
+  const items = REAL.filter((q) => wanted.has(q.id) && q.status !== "revision");
+  return shuffle(items.map((q) => toRealItem(q, CATEGORY_SOURCE[q.category], q.lvl ?? 3)));
 }
 
 function sjtItem(tier = 3) {
