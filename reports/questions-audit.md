@@ -6,10 +6,20 @@ _(f) y (g) parten de 123 assets encontrados en public/assets/exams/._
 
 ## Registro de sesiones (trabajo manual, no derivable de REAL)
 
-### 2026-09-07 (ronda 3, fix/banco-preguntas-v2)
+### 2026-09-07 (ronda 4)
 
-- Re-auditado el banco completo (710 ítems) desde cero, sin asumir los 3 fallos reportados: los 3 ya se habían corregido en la ronda anterior (20-ago) — 0 imágenes cruzadas, 0 correctIndex fuera de rango, opciones ya soportan hasta 6 sin truncar a 4 (ver INFORME_AUDITORIA.md en la raíz para el detalle). Sospecha principal de por qué seguían viéndose: la PWA no tenía forma de que el usuario supiera si estaba en caché vieja ni de enterarse de una actualización -> añadido indicador de versión en Ajustes + comprobación activa de actualización + aviso 'actualizar ahora' (ver js/app.js, js/version.js).
-- El único hallazgo real (opciones que son imágenes) no tenía ningún caso en el banco actual — el candidato conocido (dominó) sigue correctamente en needs_review por no poder determinarse sin adivinar. Añadido el soporte de todos modos (schema: una opción puede ser string u objeto {text,asset}; js/engine.js: optionText/optionAsset + renderizado con zoom) para cuando se resuelva ese o futuros casos. Nuevo check (b2) aquí mismo: opción-objeto sin texto ni asset, o con asset roto.
+- La ronda 3 (mismo día, más abajo) se equivocó: concluyó 'no reproduce' para las categorías matrices/figuras_no_relacionadas/series_figuras basándose solo en heurísticas (rango, carpeta, duplicados). El usuario reportó que el bug seguía viéndose tras confirmar que sí tenía la versión nueva -> auditoría visual página a página (public/assets/exams/{matrices,figuras_no_relacionadas,test_series_figuras}/) contra scripts/build_figures_with_keys.py (data/raw_extracted/), que reveló el bug real: ese script generador calculaba la página de cada ítem con un items_per_page FIJO por categoría (6/12/3) en vez del recuento real por página, y fijaba 'options: LETTERS[:4]' para TODAS las categorías por un ternario roto (ambas ramas idénticas) aunque matrices/figuras_no_relacionadas/series_figuras no son todas de 4 opciones.
+- matrices (60 ítems): es de 5 opciones (a-e) en TODA la página, confirmado visualmente en las 10 páginas (p2-p11). Página real por ítem ≠ la asumida (p.ej. matrices-c1-7 apuntaba a p3.png, la real es p2.png; los 30 ítems de Cuestionario 2 apuntaban a las páginas de Cuestionario 1 en vez de a p7-p11, que existían en disco pero huérfanas). Recalculada la página real de los 60 ítems y ampliadas sus opciones a 5. correctIndex ya era fiable (viene de la clave transcrita a mano en build_figures_with_keys.py, 'verificado visualmente' según su propio comentario) — no se tocó.
+- series_figuras / tsf-* (60 ítems; ex20240317-*/wa-aptitudes-* de esta misma categoría NO vienen de este script, no se tocaron): p2.png resultó ser la portada de instrucciones del PDF, no la primera pregunta -> TODOS los ítems apuntaban a la página siguiente a la que debían. Recalculada la página real de los 60 ítems (4 opciones a-d en toda la categoría, confirmado en las 13 páginas p3-p14).
+- figuras_no_relacionadas / fnr-* (50 ítems): items_per_page=12 asumido no encajaba con el límite real de página (p2 tiene 11 ítems, no 12; Cuestionario 2 empieza a mitad de p4, no en una página propia). Recalculada la página real de los 50 ítems (4 opciones a-d, confirmado en 5 páginas p2-p6).
+- 11 ítems (6 tsf + 5 fnr) tenían la clave OCR marcando letra 'E', imposible en un test de 4 opciones a-d -> señal de clave corrupta/desalineada para esos ítems concretos. Resueltos con certeza cruzando imagen+explicación: tsf-c1-23 (progresión al cuadrado: 2,4,16,256 -> c), fnr-c1-5 (única letra de líneas rectas entre B/D/H/S -> c), fnr-c2-19 (única figura dividida en 4 partes -> c). Los 8 restantes NO se pudieron determinar sin ambigüedad -> marcados status:'revision' con notaRevision explicando el motivo exacto y la página del PDF a revisar a mano, en vez de adivinar la letra.
+- Re-encriptado real.source.js -> real.enc.json y CACHE_VERSION/APP_VERSION subidos para que el fix llegue de verdad a la PWA instalada (ver ronda anterior sobre el problema de caché).
+
+### 2026-09-07 (ronda 3, diagnóstico inicial — parcialmente incorrecto, ver ronda 4)
+
+- Concluyó, solo con heurísticas (rango, carpeta, duplicados, sin abrir ninguna imagen), que los 3 fallos reportados no reproducían y que ya estaban corregidos desde el 20-ago. Esto resultó ser incorrecto para matrices/figuras_no_relacionadas/series_figuras (ver ronda 4): las heurísticas no podían detectar un items_per_page mal calculado ni un ternario de opciones roto, porque ninguna de las dos cosas produce un dato 'fuera de rango' en sí misma.
+- Sí acertó en diagnosticar y arreglar un problema real y distinto: la PWA no avisaba de actualizaciones disponibles (cache-first sin comprobación activa) -> añadido indicador de versión en Ajustes + botón 'Buscar actualizaciones' + aviso 'Actualizar ahora' (js/app.js, js/version.js). Esto seguía siendo necesario aunque la causa principal del bug reportado fuera otra.
+- Añadido soporte de opciones-imagen (schema: opción string u objeto {text,asset}; js/engine.js: optionText/optionAsset + render con zoom) sin ningún caso real que lo necesite todavía en el banco.
 
 ### 2026-08-20 (ronda 2)
 
@@ -67,13 +77,13 @@ Ninguno. (Nota: una comprobación ingenua solo por texto de prompt da 60 falsos 
 |---|---|---|
 | analogias | 125 | 0 |
 | domino | 19 | 0 |
-| figuras_no_relacionadas | 50 | 0 |
+| figuras_no_relacionadas | 50 | 3 |
 | ingles_b1 | 50 | 0 |
 | ingles_b2 | 45 | 0 |
 | matrices | 73 | 0 |
 | razonamiento_numerico | 40 | 0 |
 | relojes | 40 | 0 |
 | secuencia_num_letras | 39 | 0 |
-| series_figuras | 77 | 0 |
+| series_figuras | 77 | 5 |
 | series_numeros | 60 | 0 |
 | sinonimos_antonimos | 92 | 0 |
