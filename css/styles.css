@@ -234,6 +234,19 @@ button { font-family: inherit; cursor: pointer; }
   padding-bottom: env(safe-area-inset-bottom); /* home indicator / nav por gestos */
 }
 .bottomnav__inner { display: flex; width: 100%; max-width: var(--max-w); margin: 0 auto; }
+
+/* Aviso de "hay versión nueva". Arriba (el pie ya lo ocupan .bottomnav y .feedback);
+   por encima de todo salvo la pantalla de carga inicial. No se recarga solo: el SW ya
+   tomó el control en segundo plano, pero recargar de golpe podría tirar una lección a
+   medias, así que se pide confirmación con un toque. */
+.update-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+  display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+  background: var(--blue); color: #fff; font-weight: 800; font-size: 14px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+}
+.update-banner[hidden] { display: none; }
+.update-banner .link-btn { color: #fff; text-decoration-color: rgba(255,255,255,.6); }
 /* min-width:0 es el fix real: sin él, un flex item nunca se encoge por debajo del
    ancho de su contenido (aquí, la etiqueta en mayúsculas tipo "PRÁCTICA"/"PROGRESO"),
    así que en pantallas estrechas el conjunto de 5 botones se salía del viewport por

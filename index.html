@@ -175,6 +175,11 @@
     <div class="card">
       <div class="card__title">Acerca de</div>
       <p class="note">Diseño inspirado en Duolingo, sin afiliación ni contenido propietario. Tipografía Nunito (la original es propietaria). Preguntas numéricas, abstractas y verbales generadas por procedimiento: la respuesta correcta lo es por construcción.</p>
+      <div class="row">
+        <div><div class="row__label">Versión cargada</div><div class="row__hint" id="app-version">…</div></div>
+        <button type="button" class="link-btn" id="check-update">Buscar actualizaciones</button>
+      </div>
+      <p class="note" id="update-status" aria-live="polite"></p>
     </div>
   </main>
 </section>
@@ -237,6 +242,12 @@
     <button type="button" class="navbtn" data-nav="settings"><span aria-hidden="true">⚙️</span><span class="navbtn__label">Ajustes</span></button>
   </div>
 </nav>
+
+<!-- ============================ AVISO DE ACTUALIZACIÓN ============================ -->
+<div class="update-banner" id="update-banner" role="status" hidden>
+  <span>Hay una versión nueva de la app lista.</span>
+  <button type="button" class="link-btn" id="update-reload">Actualizar ahora</button>
+</div>
 
 <script type="module" src="./js/app.js"></script>
 </body>
