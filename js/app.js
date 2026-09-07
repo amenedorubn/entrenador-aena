@@ -3,7 +3,7 @@ import {
   isPassed, lessonState, currentLessonIndex, unitProgress, worldProgress, worldUnlocked, totalPassed,
 } from "./curriculum.js";
 import { buildLesson, makeItem, SOURCE_LABELS, SOURCES } from "./content.js";
-import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speak, stopSpeech } from "./engine.js";
+import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speak, stopSpeech, optionText } from "./engine.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
 import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/competencias.js";
 import { loadReal } from "../data/real.js";
@@ -241,7 +241,10 @@ function evaluate() {
   const sol = $("feedback-solution");
   if (!good) {
     sol.classList.remove("hidden");
-    sol.textContent = `Respuesta correcta: ${item.kind === "wordbank" ? item.answer.join(" ") : item.options[item.correctIndex]}`;
+    const correctLabel = item.kind === "wordbank"
+      ? item.answer.join(" ")
+      : optionText(item.options[item.correctIndex]) || `la marcada como correcta arriba (opción ${"ABCDEF"[item.correctIndex]})`;
+    sol.textContent = `Respuesta correcta: ${correctLabel}`;
   } else {
     sol.classList.add("hidden");
   }

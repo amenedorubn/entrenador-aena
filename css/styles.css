@@ -328,6 +328,29 @@ button { font-family: inherit; cursor: pointer; }
 .option.is-wrong .option__key { border-color: var(--red); color: var(--red-dark); }
 .option.is-wrong .option__key::after { content: "✕"; }
 .option:disabled { cursor: default; }
+.option[aria-disabled="true"] { cursor: default; }
+
+/* Opción-imagen: la opción en sí es un gráfico/plano/esquema (no texto). El botón de
+   opción no puede ser un <button> (ver js/engine.js: no puede anidar el botón de
+   zoom), así que es un <div role="button"> — necesita cursor:pointer a mano. */
+.option--img { cursor: pointer; flex-wrap: wrap; }
+.option__imgwrap { position: relative; flex: none; }
+.option__img { display: block; max-width: 140px; max-height: 140px; border-radius: 8px; }
+.option__zoom {
+  position: absolute; right: 4px; bottom: 4px; z-index: 1;
+  width: 28px; height: 28px; display: grid; place-items: center;
+  background: var(--surface); border: 2px solid var(--border); border-radius: 50%;
+  font-size: 13px; cursor: pointer;
+}
+
+/* Lightbox para ampliar una imagen de opción con un toque. */
+.lightbox {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0, 0, 0, .85); padding: 24px; cursor: zoom-out;
+  align-items: center; justify-content: center;
+}
+.lightbox.show { display: flex; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
 
 /* Banco de palabras (producción escrita) */
 .wordbank { margin-top: 8px; }
