@@ -6,6 +6,13 @@
 //   {k:"sqfill", p, fill}               cuadrado, punto en esquina p, relleno sí/no
 //   {k:"combo", n, fill, dots}          polígono n lados + relleno + nº de puntos interiores
 //   {k:"grid", cells:[9 booleanos]}     rejilla 3×3 de celdas llenas/vacías
+//   {k:"clock", hour}                   reloj analógico marcando `hour` en punto (1-12)
+//   {k:"domino", a, b}                  ficha de dominó, mitades a y b (0-6 cada una)
+//
+// clockSeries/dominoTile imitan el FORMATO de relojes/dominó del banco real (mismo
+// género de pregunta que verás en el examen) pero son preguntas nuevas cada vez, no
+// transcripciones -- por eso llevan la píldora gris "Generada · práctica" en vez de la
+// dorada de "REAL" (engine.js: badge por item.kind, no por categoría).
 import { randInt, choice, buildFigureOptions } from "./rng.js";
 
 const series = (o) => ({ kind: "figure-series", block: "abs", ...o });
@@ -61,6 +68,61 @@ export function matrix3x3(tier = 3) {
     useDots ? { k: "dots", n: randInt(1, 9) } : { k: "poly", n: randInt(3, 9) });
   return matrix({ family: "matrix1", tier, cells, options, correctIndex,
     explanation: `Cada fila crece <b>+${cs}</b> por columna y cada columna <b>+${rs}</b> por fila → la celda que falta tiene <b>${useDots ? `${ans.n} puntos` : `${ans.n} lados`}</b>.` });
+}
+
+function wrapHour(h) {
+  return ((h - 1) % 12 + 12) % 12 + 1;
+}
+
+/** "¿Qué hora marca el siguiente reloj?" -- imita relojes del banco real (RELOJES.pdf). */
+export function clockSeries(tier = 3) {
+  const start = randInt(1, 12);
+  const alternating = tier >= 4 && Math.random() < 0.5;
+  const hours = [start];
+  let explanation, family;
+  if (alternating) {
+    const stepA = choice([1, 2, 3]);
+    const stepB = choice([1, 2, 3].filter((s) => s !== stepA));
+    for (let i = 0; i < 3; i++) hours.push(wrapHour(hours[i] + (i % 2 === 0 ? stepA : stepB)));
+    family = "clock-alt";
+    explanation = `El salto entre relojes alterna: <b>+${stepA}h, +${stepB}h, +${stepA}h</b>`;
+  } else {
+    const step = choice(tier <= 2 ? [1, 2] : tier === 3 ? [1, 2, 3] : [2, 3, 4, 5]);
+    for (let i = 0; i < 3; i++) hours.push(wrapHour(hours[i] + step));
+    family = "clock";
+    explanation = `Cada reloj avanza <b>${step} horas</b> respecto al anterior`;
+  }
+  const ans = hours[3];
+  const seq = hours.slice(0, 3).map((h) => ({ k: "clock", hour: h }));
+  const { options, correctIndex } = buildFigureOptions({ k: "clock", hour: ans }, () => ({ k: "clock", hour: randInt(1, 12) }));
+  return series({ family, tier, seq, options, correctIndex, explanation: `${explanation} → <b>${ans}:00</b>.` });
+}
+
+function wrapPip(n) {
+  return ((n % 7) + 7) % 7;
+}
+
+/** "¿Qué ficha completa la serie?" -- imita el dominó del banco real (DOMINO.pdf). */
+export function dominoTile(tier = 4) {
+  const a0 = randInt(0, 6), b0 = randInt(0, 6);
+  const mirror = tier >= 4 && Math.random() < 0.4;
+  const tiles = [[a0, b0]];
+  let explanation, family;
+  if (mirror) {
+    for (let i = 0; i < 3; i++) { const [a, b] = tiles[i]; tiles.push([b, a]); }
+    family = "domino-mirror";
+    explanation = "Cada ficha es el <b>reflejo especular</b> (mitades intercambiadas) de la anterior";
+  } else {
+    const delta = choice([1, 2, -1, -2, 3, -3]);
+    for (let i = 0; i < 3; i++) { const [a, b] = tiles[i]; tiles.push([wrapPip(a + delta), wrapPip(b + delta)]); }
+    family = "domino";
+    explanation = `Ambas mitades avanzan <b>${delta >= 0 ? "+" : ""}${delta}</b> respecto a la ficha anterior (0-6 en bucle)`;
+  }
+  const [ansA, ansB] = tiles[3];
+  const seq = tiles.slice(0, 3).map(([a, b]) => ({ k: "domino", a, b }));
+  const { options, correctIndex } = buildFigureOptions({ k: "domino", a: ansA, b: ansB },
+    () => ({ k: "domino", a: randInt(0, 6), b: randInt(0, 6) }));
+  return series({ family, tier, seq, options, correctIndex, explanation: `${explanation} → <b>${ansA}-${ansB}</b>.` });
 }
 
 export function doubleTransform(tier = 3) {
@@ -191,9 +253,9 @@ export function rotationPlusCount(tier = 5) {
 export const ABS_FAMILIES = {
   1: [(t) => rotationSeries(t, 90), (t) => countSeries(t, 1)],
   2: [(t) => rotationSeries(t, 45), (t) => countSeries(t, -2), polySides],
-  3: [matrix3x3, doubleTransform],
-  4: [comboSeries, acceleratingRotation, matrixTwoAttr],
-  5: [logicGrid, matrixThreeAttr, rotationPlusCount],
+  3: [matrix3x3, doubleTransform, clockSeries],
+  4: [comboSeries, acceleratingRotation, matrixTwoAttr, clockSeries, dominoTile],
+  5: [logicGrid, matrixThreeAttr, rotationPlusCount, clockSeries, dominoTile],
 };
 
 export function generateAbstract(tier) {

@@ -44,9 +44,11 @@ trae preguntas nuevas aunque practiques varias veces al día durante meses.
   trabajo, interés compuesto, media ponderada, repartos proporcionales, combinatoria
   (permutaciones, combinaciones, anagramas, comités), probabilidad simple y compuesta,
   matrices numéricas, ángulos de reloj y problemas multi-paso con IVA.
-- **Abstracto** — 12 familias: rotaciones (fijas y aceleradas), conteo, número de lados,
-  doble transformación, matrices 3×3 de uno, dos y tres atributos, y **operaciones
-  booleanas AND/OR/XOR sobre rejillas** en el nivel máximo.
+- **Abstracto** — 14 familias: rotaciones (fijas y aceleradas), conteo, número de lados,
+  doble transformación, matrices 3×3 de uno, dos y tres atributos, **operaciones
+  booleanas AND/OR/XOR sobre rejillas** en el nivel máximo, y **relojes y dominó** al
+  estilo de los del banco real (mismo formato de pregunta, corrección por construcción)
+  — llevan la píldora gris "Generada · práctica" para no confundirlos con los reales.
 - **Verbal** — generado a partir de un léxico con marcas semánticas: sinónimos, antónimos,
   analogías por tipo de relación, palabra intrusa, series de letras (simples, mixtas
   letra-número e intercaladas) y **silogismos y condicionales** con validez lógica fijada
@@ -75,7 +77,7 @@ Es el requisito crítico: una respuesta mal marcada rompe la utilidad de la app.
 - **Las matrices lógicas verifican unicidad**: las dos filas visibles deben descartar
   todas las demás operaciones booleanas, o el enunciado se regenera. Sin esa comprobación
   una matriz podía admitir dos reglas y la respuesta no sería única.
-- **83 tests** (Vitest) cubren esto: recomputan la regla de forma independiente a partir
+- **96 tests** (Vitest) cubren esto: recomputan la regla de forma independiente a partir
   del propio enunciado generado, verifican que no hay opciones duplicadas ni distractores
   ambiguos, y comprueban la integridad de los bancos y del desbloqueo del camino.
 

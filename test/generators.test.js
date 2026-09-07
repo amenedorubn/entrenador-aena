@@ -281,6 +281,56 @@ describe("reglas abstractas recomputadas", () => {
       expect(ans.rot).toBe((last.rot + step) % 360);
     }
   });
+
+  it("clockSeries: paso constante u alternante, siempre 1-12", () => {
+    for (const tier of [1, 3, 4, 5]) {
+      for (let i = 0; i < N_REPS; i++) {
+        const it = A.clockSeries(tier);
+        for (const f of it.seq) { expect(f.hour).toBeGreaterThanOrEqual(1); expect(f.hour).toBeLessThanOrEqual(12); }
+        const ans = it.options[it.correctIndex];
+        expect(ans.hour).toBeGreaterThanOrEqual(1);
+        expect(ans.hour).toBeLessThanOrEqual(12);
+        const wrap = (h) => ((h - 1) % 12 + 12) % 12 + 1;
+        if (it.family === "clock-alt") {
+          // Patrón A,B,A: el paso 0->1 (A) debe repetirse en 2->ans; 1->2 (B) es distinto.
+          const stepA = (it.seq[1].hour - it.seq[0].hour + 12) % 12 || 12;
+          const stepB = (it.seq[2].hour - it.seq[1].hour + 12) % 12 || 12;
+          expect(stepB).not.toBe(stepA);
+          expect(wrap(it.seq[2].hour + stepA)).toBe(ans.hour);
+        } else {
+          const step = (it.seq[1].hour - it.seq[0].hour + 12) % 12;
+          expect((it.seq[2].hour - it.seq[1].hour + 12) % 12).toBe(step);
+          expect(wrap(it.seq[2].hour + step)).toBe(ans.hour);
+        }
+      }
+    }
+  });
+
+  it("dominoTile: delta constante en ambas mitades, o espejo alternado", () => {
+    for (const tier of [1, 4, 5]) {
+      for (let i = 0; i < N_REPS; i++) {
+        const it = A.dominoTile(tier);
+        for (const f of it.seq) {
+          expect(f.a).toBeGreaterThanOrEqual(0); expect(f.a).toBeLessThanOrEqual(6);
+          expect(f.b).toBeGreaterThanOrEqual(0); expect(f.b).toBeLessThanOrEqual(6);
+        }
+        const ans = it.options[it.correctIndex];
+        const wrap = (n) => ((n % 7) + 7) % 7;
+        const last = it.seq.at(-1);
+        if (it.family === "domino-mirror") {
+          expect(ans).toEqual({ k: "domino", a: last.b, b: last.a });
+        } else {
+          // wrap(x + delta) no depende de si delta se generó en negativo o su
+          // equivalente positivo mod 7 (son el mismo desplazamiento circular).
+          const delta = wrap(it.seq[1].a - it.seq[0].a);
+          expect(wrap(it.seq[1].b - it.seq[0].b)).toBe(delta);
+          expect(wrap(it.seq[2].a - it.seq[1].a)).toBe(delta);
+          expect(wrap(it.seq[2].b - it.seq[1].b)).toBe(delta);
+          expect(ans).toEqual({ k: "domino", a: wrap(last.a + delta), b: wrap(last.b + delta) });
+        }
+      }
+    }
+  });
 });
 
 describe("gen-english · números a palabras", () => {

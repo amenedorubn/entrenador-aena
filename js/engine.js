@@ -58,14 +58,43 @@ export function fig(spec) {
     }
     return svg(d, `Rejilla con ${spec.cells.filter(Boolean).length} casillas pintadas`);
   }
+  if (spec.k === "clock") {
+    // hora 12 -> 0° (arriba), hora 3 -> 90° (derecha), ... hora H -> H*30° en sentido horario.
+    const angle = (((spec.hour % 12) + 12) % 12) * 30;
+    return svg(
+      `<circle cx="36" cy="36" r="30" fill="none" stroke="var(--border-strong)" stroke-width="3"/>
+       <g transform="rotate(${angle} 36 36)"><line x1="36" y1="36" x2="36" y2="14" stroke="var(--blue)" stroke-width="5" stroke-linecap="round"/></g>
+       <circle cx="36" cy="36" r="3" fill="var(--blue)"/>`,
+      `Reloj marcando las ${spec.hour}`);
+  }
+  if (spec.k === "domino") {
+    // Distribución de puntos estándar de dominó (0-6) en una rejilla 3x3 local a cada mitad.
+    const cols = [12, 20, 28], rows = [27, 36, 45];
+    const layout = { 0: [], 1: [[1, 1]], 2: [[0, 0], [2, 2]], 3: [[0, 0], [1, 1], [2, 2]],
+      4: [[0, 0], [2, 0], [0, 2], [2, 2]], 5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]],
+      6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]] };
+    const half = (value, dx) => (layout[value] ?? []).map(([c, r]) =>
+      `<circle cx="${cols[c] + dx}" cy="${rows[r]}" r="2.8" fill="var(--purple)"/>`).join("");
+    return svg(
+      `<rect x="4" y="18" width="64" height="36" rx="5" fill="none" stroke="var(--border-strong)" stroke-width="3"/>
+       <line x1="36" y1="18" x2="36" y2="54" stroke="var(--border-strong)" stroke-width="2"/>
+       ${half(spec.a, 0)}${half(spec.b, 32)}`,
+      `Ficha de dominó, ${spec.a} contra ${spec.b}`);
+  }
   return "";
 }
 
 /* ------------------------------- enunciado ------------------------------- */
 const REAL_BADGE = `<span class="badge-real" title="Pregunta tal cual apareció en una convocatoria oficial">REAL · examen oficial</span>`;
+// Mismo tratamiento visual que REAL_BADGE (una píldora, igual de visible) pero en gris:
+// las figuras generadas (reloj, dominó, matrices...) pueden parecerse mucho a las
+// reales del banco -- que no se confundan una con otra a simple vista.
+const GENERATED_BADGE = `<span class="badge-generated" title="Pregunta generada automáticamente para practicar, no es del examen real">Generada · práctica</span>`;
 
 export function renderQuestion(item, el, onListen) {
-  const badge = item.isReal ? REAL_BADGE : "";
+  const badge = item.isReal ? REAL_BADGE
+    : (item.kind === "figure-series" || item.kind === "matrix") ? GENERATED_BADGE
+    : "";
   if (item.kind === "figure-series") {
     el.innerHTML = `${badge}<p class="question">¿Qué figura continúa la serie?</p>
       <div class="figrow">${item.seq.map((f) => `<div class="fig">${fig(f)}</div>`).join("")}<div class="qmark" aria-label="incógnita">?</div></div>`;
