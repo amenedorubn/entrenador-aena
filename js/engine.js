@@ -86,23 +86,76 @@ export function renderQuestion(item, el, onListen) {
 }
 
 /* ------------------------------- respuestas ------------------------------- */
+// Una opción del banco real puede ser un string (caso normal) o un objeto
+// { text, asset } cuando la opción en sí es una imagen (gráfico/plano/esquema), con
+// o sin texto que la acompañe. optionText/optionAsset normalizan ambas formas: úsalas
+// en vez de leer `o` a pelo en cualquier sitio que muestre o compare opciones.
+export function optionText(o) {
+  return typeof o === "string" ? o : (o?.text ?? "");
+}
+export function optionAsset(o) {
+  return typeof o === "string" ? null : (o?.asset ?? null);
+}
+
+/** Lightbox mínimo para ampliar una imagen de opción con un toque (móvil-friendly). */
+function openLightbox(src, alt) {
+  let box = document.getElementById("img-lightbox");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "img-lightbox";
+    box.className = "lightbox";
+    box.innerHTML = `<img alt="">`;
+    box.addEventListener("click", () => box.classList.remove("show"));
+    document.body.appendChild(box);
+  }
+  box.querySelector("img").src = src;
+  box.querySelector("img").alt = alt;
+  box.classList.add("show");
+}
+
 /** Opciones tipo test. onChange(index|null) informa de la selección actual. */
 export function renderOptions(item, el, onChange) {
   const isFig = item.kind === "figure-series" || item.kind === "matrix";
   el.className = isFig ? "options options--figs" : "options";
   el.innerHTML = item.options
     .map((o, i) => {
-      const content = isFig ? `<span class="fig">${fig(o)}</span>` : `<span>${o}</span>`;
-      return `<button type="button" class="option" data-i="${i}" aria-pressed="false"><span class="option__key">${KEYS[i]}</span>${content}</button>`;
+      if (isFig) return `<button type="button" class="option" data-i="${i}" aria-pressed="false"><span class="option__key">${KEYS[i]}</span><span class="fig">${fig(o)}</span></button>`;
+      const asset = optionAsset(o);
+      const text = optionText(o);
+      const label = text || `Opción ${KEYS[i]}`;
+      if (!asset) return `<button type="button" class="option" data-i="${i}" aria-pressed="false"><span class="option__key">${KEYS[i]}</span><span>${text}</span></button>`;
+      // Una opción-imagen no puede ser un <button> anidando otro <button> (el botón de
+      // zoom): un <button> dentro de otro es HTML inválido y el parser cierra el de
+      // fuera en cuanto encuentra el de dentro, rompiendo la selección. Se usa un <div
+      // role="button"> con manejo de teclado propio en su lugar.
+      const img = `<span class="option__imgwrap"><img class="option__img" src="./public/assets/exams/${asset}" alt="${label}" loading="lazy"><span class="option__zoom" data-zoom="${i}" role="button" tabindex="0" aria-label="Ampliar imagen de la opción ${KEYS[i]}">🔍</span></span>`;
+      return `<div class="option option--img" data-i="${i}" role="button" tabindex="0" aria-pressed="false"><span class="option__key">${KEYS[i]}</span>${img}${text ? `<span>${text}</span>` : ""}</div>`;
     })
     .join("");
   let selected = null;
-  el.querySelectorAll(".option").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      selected = Number(btn.dataset.i);
-      el.querySelectorAll(".option").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+  el.querySelectorAll(".option").forEach((opt) => {
+    const activate = () => {
+      selected = Number(opt.dataset.i);
+      el.querySelectorAll(".option").forEach((o) => o.setAttribute("aria-pressed", String(o === opt)));
       onChange(selected);
-    });
+    };
+    opt.addEventListener("click", activate);
+    if (opt.tagName !== "BUTTON") {
+      opt.addEventListener("keydown", (e) => {
+        if (e.target.closest(".option__zoom")) return; // el zoom gestiona su propia tecla
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
+      });
+    }
+  });
+  el.querySelectorAll(".option__zoom").forEach((btn) => {
+    const openZoom = (e) => {
+      e.stopPropagation();
+      const i = Number(btn.dataset.zoom);
+      const o = item.options[i];
+      openLightbox(`./public/assets/exams/${optionAsset(o)}`, optionText(o) || `Opción ${KEYS[i]}`);
+    };
+    btn.addEventListener("click", openZoom);
+    btn.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openZoom(e); } });
   });
 }
 
@@ -143,7 +196,16 @@ export function renderWordbank(item, el, onChange) {
 /** Marca visualmente acierto/error (color + icono + texto, nunca solo color). */
 export function markOptions(el, correctIndex, chosenIndex) {
   const btns = el.querySelectorAll(".option");
-  btns.forEach((b) => { b.disabled = true; b.setAttribute("aria-pressed", "false"); });
+  // .option--img es un <div role="button">, no un <button>: `.disabled` no existe en
+  // un div (no-op silencioso), así que el bloqueo real para esas opciones va por
+  // aria-disabled + pointer-events, además de quitarlas del orden de tabulación.
+  btns.forEach((b) => {
+    b.disabled = true;
+    b.setAttribute("aria-disabled", "true");
+    b.style.pointerEvents = "none";
+    b.tabIndex = -1;
+    b.setAttribute("aria-pressed", "false");
+  });
   btns[correctIndex]?.classList.add("is-correct");
   if (chosenIndex !== null && chosenIndex !== correctIndex) btns[chosenIndex]?.classList.add("is-wrong");
 }

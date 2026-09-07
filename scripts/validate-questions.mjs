@@ -158,6 +158,13 @@ function numberInOptions(options, value, tolerance = 0.5) {
 // directamente en el .md.
 const SESSION_LOG = [
   {
+    date: "2026-09-07 (ronda 3, fix/banco-preguntas-v2)",
+    notes: [
+      "Re-auditado el banco completo (710 ítems) desde cero, sin asumir los 3 fallos reportados: los 3 ya se habían corregido en la ronda anterior (20-ago) — 0 imágenes cruzadas, 0 correctIndex fuera de rango, opciones ya soportan hasta 6 sin truncar a 4 (ver INFORME_AUDITORIA.md en la raíz para el detalle). Sospecha principal de por qué seguían viéndose: la PWA no tenía forma de que el usuario supiera si estaba en caché vieja ni de enterarse de una actualización -> añadido indicador de versión en Ajustes + comprobación activa de actualización + aviso 'actualizar ahora' (ver js/app.js, js/version.js).",
+      "El único hallazgo real (opciones que son imágenes) no tenía ningún caso en el banco actual — el candidato conocido (dominó) sigue correctamente en needs_review por no poder determinarse sin adivinar. Añadido el soporte de todos modos (schema: una opción puede ser string u objeto {text,asset}; js/engine.js: optionText/optionAsset + renderizado con zoom) para cuando se resuelva ese o futuros casos. Nuevo check (b2) aquí mismo: opción-objeto sin texto ni asset, o con asset roto.",
+    ],
+  },
+  {
     date: "2026-08-20 (ronda 2)",
     notes: [
       "Detector requiresAsset ampliado con patrones de dependencia implícita (ver (h) más abajo) — cubre el caso que se escapó: wa-aptitudes-42 (\"Se entrevistaron a 200 ancianos...\") no usa ninguna palabra tipo gráfico/tabla/figura.",
@@ -182,7 +189,7 @@ function normalizeSignature(text) {
 }
 
 /* ------------------------------- recorrido principal ------------------------------- */
-const findings = { outOfRange: [], dupOptions: [], arithmeticMismatch: [], truncated: [], missingAsset: [], brokenImage: [], crossedImage: [], implicitDependency: [] };
+const findings = { outOfRange: [], dupOptions: [], arithmeticMismatch: [], truncated: [], missingAsset: [], brokenImage: [], crossedImage: [], implicitDependency: [], badOptionShape: [] };
 // Duplicados por firma normalizada del prompt. Incluye el campo `image` en la firma:
 // las preguntas de figura comparten prompt genérico ("¿Qué figura completa...") y lo
 // que las distingue de verdad es la imagen, así que sin esto casi todas las preguntas
@@ -207,9 +214,19 @@ for (const it of REAL) {
     findings.outOfRange.push(it);
   }
 
-  // (b)
-  if (new Set(it.options).size !== it.options.length) {
+  // (b) — una opción puede ser un string o un objeto { text, asset } (opción-imagen,
+  // ver js/engine.js: optionText/optionAsset); comparar objetos con Set nunca detecta
+  // duplicados porque cada uno es una referencia distinta, así que se compara por una
+  // clave serializada.
+  const optKey = (o) => (typeof o === "string" ? o : JSON.stringify(o));
+  if (new Set(it.options.map(optKey)).size !== it.options.length) {
     findings.dupOptions.push(it);
+  }
+  // (b2) opción-objeto sin texto ni asset, o con asset que no existe en disco.
+  for (const o of it.options) {
+    if (typeof o === "string") continue;
+    if (!o.text && !o.asset) findings.badOptionShape.push({ ...it, reason: "opción sin texto ni asset" });
+    else if (o.asset && !diskAssets.has(o.asset)) findings.badOptionShape.push({ ...it, reason: `asset de opción "${o.asset}" no existe` });
   }
 
   // (c)
@@ -270,7 +287,7 @@ for (const it of REAL) {
 
 const revisionIds = new Set([
   ...findings.outOfRange, ...findings.dupOptions, ...findings.arithmeticMismatch,
-  ...findings.missingAsset, ...findings.crossedImage,
+  ...findings.missingAsset, ...findings.crossedImage, ...findings.badOptionShape,
 ].map((it) => it.id));
 const alreadyMarked = [...revisionIds].filter((id) => REAL.find((r) => r.id === id)?.status === "revision");
 const stillPending = [...revisionIds].filter((id) => !alreadyMarked.includes(id));
@@ -302,8 +319,13 @@ for (const entry of SESSION_LOG) {
 md += section("(a) correctIndex fuera de rango", findings.outOfRange,
   (it) => `- \`${it.id}\`: correctIndex=${it.correctIndex}, ${it.options.length} opciones — "${it.prompt.slice(0, 80)}..."`);
 
+const optLabel = (o) => (typeof o === "string" ? o : `{${[o.text, o.asset].filter(Boolean).join(", ")}}`);
+
 md += section("(b) opciones duplicadas", findings.dupOptions,
-  (it) => `- \`${it.id}\`: [${it.options.join(" | ")}]`);
+  (it) => `- \`${it.id}\`: [${it.options.map(optLabel).join(" | ")}]`);
+
+md += section("(b2) opción con forma inválida (ni texto ni asset, o asset roto)", findings.badOptionShape,
+  (it) => `- \`${it.id}\` (${it.reason}): [${it.options.map(optLabel).join(" | ")}]`);
 
 md += section("(c) aritmética simple: el resultado calculado no coincide con la opción marcada", findings.arithmeticMismatch,
   (it) => `- \`${it.id}\`: calculado=${it.expected}, marcada=${it.options[it.correctIndex]} (opciones: [${it.options.join(" | ")}]) — "${it.prompt}"`);
@@ -350,4 +372,5 @@ console.log(`  (f) imagen rota: ${findings.brokenImage.length}`);
 console.log(`  (g) posible imagen cruzada: ${findings.crossedImage.length}`);
 console.log(`  (h) dependencia implícita (señal blanda): ${findings.implicitDependency.length}`);
 console.log(`  (i) grupos duplicados: ${duplicateGroups.length}`);
+console.log(`  (b2) forma de opción inválida: ${findings.badOptionShape.length}`);
 console.log(`  total propuesto para revision: ${revisionIds.size}`);

@@ -234,6 +234,19 @@ button { font-family: inherit; cursor: pointer; }
   padding-bottom: env(safe-area-inset-bottom); /* home indicator / nav por gestos */
 }
 .bottomnav__inner { display: flex; width: 100%; max-width: var(--max-w); margin: 0 auto; }
+
+/* Aviso de "hay versión nueva". Arriba (el pie ya lo ocupan .bottomnav y .feedback);
+   por encima de todo salvo la pantalla de carga inicial. No se recarga solo: el SW ya
+   tomó el control en segundo plano, pero recargar de golpe podría tirar una lección a
+   medias, así que se pide confirmación con un toque. */
+.update-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+  display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+  background: var(--blue); color: #fff; font-weight: 800; font-size: 14px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+}
+.update-banner[hidden] { display: none; }
+.update-banner .link-btn { color: #fff; text-decoration-color: rgba(255,255,255,.6); }
 /* min-width:0 es el fix real: sin él, un flex item nunca se encoge por debajo del
    ancho de su contenido (aquí, la etiqueta en mayúsculas tipo "PRÁCTICA"/"PROGRESO"),
    así que en pantallas estrechas el conjunto de 5 botones se salía del viewport por
@@ -315,6 +328,29 @@ button { font-family: inherit; cursor: pointer; }
 .option.is-wrong .option__key { border-color: var(--red); color: var(--red-dark); }
 .option.is-wrong .option__key::after { content: "✕"; }
 .option:disabled { cursor: default; }
+.option[aria-disabled="true"] { cursor: default; }
+
+/* Opción-imagen: la opción en sí es un gráfico/plano/esquema (no texto). El botón de
+   opción no puede ser un <button> (ver js/engine.js: no puede anidar el botón de
+   zoom), así que es un <div role="button"> — necesita cursor:pointer a mano. */
+.option--img { cursor: pointer; flex-wrap: wrap; }
+.option__imgwrap { position: relative; flex: none; }
+.option__img { display: block; max-width: 140px; max-height: 140px; border-radius: 8px; }
+.option__zoom {
+  position: absolute; right: 4px; bottom: 4px; z-index: 1;
+  width: 28px; height: 28px; display: grid; place-items: center;
+  background: var(--surface); border: 2px solid var(--border); border-radius: 50%;
+  font-size: 13px; cursor: pointer;
+}
+
+/* Lightbox para ampliar una imagen de opción con un toque. */
+.lightbox {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0, 0, 0, .85); padding: 24px; cursor: zoom-out;
+  align-items: center; justify-content: center;
+}
+.lightbox.show { display: flex; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
 
 /* Banco de palabras (producción escrita) */
 .wordbank { margin-top: 8px; }

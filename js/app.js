@@ -3,11 +3,12 @@ import {
   isPassed, lessonState, currentLessonIndex, unitProgress, worldProgress, worldUnlocked, totalPassed,
 } from "./curriculum.js";
 import { buildLesson, makeItem, SOURCE_LABELS, SOURCES } from "./content.js";
-import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speak, stopSpeech } from "./engine.js";
+import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speak, stopSpeech, optionText } from "./engine.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
 import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/competencias.js";
 import { loadReal } from "../data/real.js";
 import { choice, shuffle } from "./rng.js";
+import { APP_VERSION } from "./version.js";
 
 /* ============================== almacenamiento ============================== */
 const K = "aena2_";
@@ -240,7 +241,10 @@ function evaluate() {
   const sol = $("feedback-solution");
   if (!good) {
     sol.classList.remove("hidden");
-    sol.textContent = `Respuesta correcta: ${item.kind === "wordbank" ? item.answer.join(" ") : item.options[item.correctIndex]}`;
+    const correctLabel = item.kind === "wordbank"
+      ? item.answer.join(" ")
+      : optionText(item.options[item.correctIndex]) || `la marcada como correcta arriba (opción ${"ABCDEF"[item.correctIndex]})`;
+    sol.textContent = `Respuesta correcta: ${correctLabel}`;
   } else {
     sol.classList.add("hidden");
   }
@@ -408,6 +412,7 @@ function renderSettings() {
   document.querySelectorAll("#hearts-picker button").forEach((b) =>
     b.setAttribute("aria-pressed", String((b.dataset.hearts === "on") === store.heartsOn)));
   $("exam-date").value = store.examDate;
+  $("app-version").textContent = APP_VERSION;
 }
 
 /* ============================== navegación ============================== */
@@ -469,11 +474,62 @@ function init() {
     applyTheme(); goto("path");
   });
 
-  goto("path");
+  $("check-update").addEventListener("click", checkForUpdate);
+  $("update-reload").addEventListener("click", () => window.location.reload());
 
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
-  }
+  goto("path");
+  initServiceWorker();
+}
+
+/* ============================== service worker / actualizaciones ==============================
+   Cache-first: si esta pestaña quedó abierta días (típico en una PWA instalada), puede
+   seguir sirviendo JS/datos viejos aunque haya un fix en el servidor. Aquí:
+   - se registra el SW al cargar y se le pide comprobar actualización cada vez que la
+     pestaña vuelve a primer plano (no solo confiar en el intervalo ~24h del navegador);
+   - "Buscar actualizaciones" en Ajustes hace lo mismo a demanda, con feedback visible;
+   - cuando un SW nuevo toma el control (nunca en la primera visita: ver
+     hadControllerAtLoad), se avisa con un banner en vez de recargar solo y tirar una
+     lección a medias. */
+let swRegistration = null;
+
+function initServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  const hadControllerAtLoad = Boolean(navigator.serviceWorker.controller);
+  let refreshed = false;
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadControllerAtLoad || refreshed) return;
+    refreshed = true;
+    $("update-status").textContent = "";
+    $("update-banner").hidden = false;
+  });
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js")
+      .then((reg) => {
+        swRegistration = reg;
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") reg.update().catch(() => {});
+        });
+      })
+      .catch(() => {});
+  });
+}
+
+function checkForUpdate() {
+  const statusEl = $("update-status");
+  if (!swRegistration) { statusEl.textContent = "Todavía no hay una versión instalada para comparar."; return; }
+  statusEl.textContent = "Buscando actualizaciones…";
+  swRegistration.update()
+    .then(() => {
+      // Si había una nueva, dispara "controllerchange" (banner) en cuanto activa,
+      // normalmente en menos de un segundo. Si no, no hay nada más que decir.
+      setTimeout(() => {
+        if (!$("update-banner").hidden) return;
+        statusEl.textContent = "Ya tienes la última versión.";
+      }, 1500);
+    })
+    .catch(() => { statusEl.textContent = "No se pudo comprobar (sin conexión?)."; });
 }
 
 /* ============================== pantalla de acceso ============================== */

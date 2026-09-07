@@ -6,6 +6,11 @@ _(f) y (g) parten de 123 assets encontrados en public/assets/exams/._
 
 ## Registro de sesiones (trabajo manual, no derivable de REAL)
 
+### 2026-09-07 (ronda 3, fix/banco-preguntas-v2)
+
+- Re-auditado el banco completo (710 ítems) desde cero, sin asumir los 3 fallos reportados: los 3 ya se habían corregido en la ronda anterior (20-ago) — 0 imágenes cruzadas, 0 correctIndex fuera de rango, opciones ya soportan hasta 6 sin truncar a 4 (ver INFORME_AUDITORIA.md en la raíz para el detalle). Sospecha principal de por qué seguían viéndose: la PWA no tenía forma de que el usuario supiera si estaba en caché vieja ni de enterarse de una actualización -> añadido indicador de versión en Ajustes + comprobación activa de actualización + aviso 'actualizar ahora' (ver js/app.js, js/version.js).
+- El único hallazgo real (opciones que son imágenes) no tenía ningún caso en el banco actual — el candidato conocido (dominó) sigue correctamente en needs_review por no poder determinarse sin adivinar. Añadido el soporte de todos modos (schema: una opción puede ser string u objeto {text,asset}; js/engine.js: optionText/optionAsset + renderizado con zoom) para cuando se resuelva ese o futuros casos. Nuevo check (b2) aquí mismo: opción-objeto sin texto ni asset, o con asset roto.
+
 ### 2026-08-20 (ronda 2)
 
 - Detector requiresAsset ampliado con patrones de dependencia implícita (ver (h) más abajo) — cubre el caso que se escapó: wa-aptitudes-42 ("Se entrevistaron a 200 ancianos...") no usa ninguna palabra tipo gráfico/tabla/figura.
@@ -21,6 +26,10 @@ _(f) y (g) parten de 123 assets encontrados en public/assets/exams/._
 Ninguno.
 
 ## (b) opciones duplicadas (0)
+
+Ninguno.
+
+## (b2) opción con forma inválida (ni texto ni asset, o asset roto) (0)
 
 Ninguno.
 
