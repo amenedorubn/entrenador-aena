@@ -436,6 +436,15 @@ button { font-family: inherit; cursor: pointer; }
 .row__label { font-size: 15px; font-weight: 700; }
 .row__hint { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 2px; }
 
+/* Pantalla "Calidad de preguntas" (Ajustes -> Ver preguntas pendientes). */
+.qcard { border-bottom: 2px solid var(--border); padding: 14px 0; }
+.qcard:last-child { border-bottom: none; }
+.qcard__id { font-size: 12px; font-weight: 800; color: var(--muted); }
+.qcard__prompt { font-weight: 800; margin: 4px 0 8px; }
+.qcard__img { max-width: 220px; border-radius: var(--radius); display: block; margin: 0 0 8px; }
+.qcard__opts { list-style: none; padding: 0; margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+.qcard__opts li { padding: 2px 0; }
+
 .segmented { display: flex; gap: 6px; }
 .segmented button {
   min-height: 44px; padding: 8px 14px; border-radius: var(--radius);

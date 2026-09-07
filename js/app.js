@@ -6,7 +6,7 @@ import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES } from
 import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speak, stopSpeech, optionText } from "./engine.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
 import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/competencias.js";
-import { loadReal } from "../data/real.js";
+import { loadReal, REAL } from "../data/real.js";
 import { choice, shuffle } from "./rng.js";
 import { APP_VERSION } from "./version.js";
 
@@ -39,11 +39,15 @@ const store = {
   // pendiente, no un historial de todo lo que alguna vez se falló).
   get missedIds() { return get("missedIds", []); },
   set missedIds(v) { set("missedIds", v); },
+  // Preguntas reales que el propio usuario marcó con "Reportar fallo" tras responder.
+  // [{ id, ts }]. Solo se guarda una vez por id (reportar dos veces actualiza ts).
+  get reportedIds() { return get("reportedIds", []); },
+  set reportedIds(v) { set("reportedIds", v); },
 };
 
 /* ============================== utilidades DOM ============================== */
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["path", "practice", "speaking", "profile", "settings", "lesson", "results", "competencias"];
+const SCREENS = ["path", "practice", "speaking", "profile", "settings", "quality", "lesson", "results", "competencias"];
 const NAV_SCREENS = new Set(["path", "practice", "speaking", "profile", "settings"]);
 
 function show(name) {
@@ -283,6 +287,16 @@ function evaluate() {
   if (item.kind === "listen") text += `<br><br><b>Transcripción:</b> ${item.audio}`;
   $("feedback-text").innerHTML = text;
 
+  const reportBtn = $("feedback-report");
+  if (item.isReal && item.id) {
+    reportBtn.classList.remove("hidden");
+    reportBtn.disabled = false;
+    reportBtn.textContent = "⚠️ Reportar fallo en esta pregunta";
+    reportBtn.dataset.id = item.id;
+  } else {
+    reportBtn.classList.add("hidden");
+  }
+
   $("check-foot").classList.add("hidden");
   const isLast = session.i === session.items.length - 1;
   const outOfHearts = session.hearts === 0;
@@ -457,6 +471,67 @@ function renderSettings() {
     b.setAttribute("aria-pressed", String((b.dataset.hearts === "on") === store.heartsOn)));
   $("exam-date").value = store.examDate;
   $("app-version").textContent = APP_VERSION;
+
+  const revisionCount = REAL.filter((q) => q.status === "revision").length;
+  const reportedCount = store.reportedIds.length;
+  $("q-summary").textContent = revisionCount || reportedCount
+    ? `${revisionCount} pendientes de revisión, ${reportedCount} reportadas por ti.`
+    : "Nada pendiente ahora mismo.";
+}
+
+/* ============================== calidad de preguntas ============================== */
+function qualityCard(q, note, { showCorrect = false } = {}) {
+  const img = q.image ? `<img class="qcard__img" src="./public/assets/exams/${q.image}" alt="Figura de la pregunta" loading="lazy">` : "";
+  const opts = q.options
+    .map((o, i) => `<li>${"ABCDEF"[i]}) ${optionText(o)}${showCorrect && i === q.correctIndex ? " ✓" : ""}</li>`)
+    .join("");
+  return `<div class="qcard">
+    <div class="qcard__id">${q.id}</div>
+    <p class="qcard__prompt">${q.prompt}</p>
+    ${img}
+    <ul class="qcard__opts">${opts}</ul>
+    <p class="note">${note}</p>
+  </div>`;
+}
+
+function renderQuality() {
+  const revisionItems = REAL.filter((q) => q.status === "revision");
+  $("q-revision-count").textContent = revisionItems.length;
+  $("q-revision-list").innerHTML = revisionItems.length
+    ? revisionItems.map((q) => qualityCard(q, q.notaRevision ?? "Sin nota.")).join("")
+    : `<p class="note">Ninguna pregunta pendiente de revisión ahora mismo.</p>`;
+
+  const reported = store.reportedIds;
+  $("q-reported-count").textContent = reported.length;
+  $("q-reported-list").innerHTML = reported.length
+    ? reported
+        .map((r) => {
+          const q = REAL.find((x) => x.id === r.id);
+          const when = new Date(r.ts).toLocaleDateString("es-ES");
+          return q
+            ? qualityCard(q, `Reportada por ti el ${when}.`, { showCorrect: true })
+            : `<div class="qcard"><div class="qcard__id">${r.id}</div><p class="note">Ya no existe en el banco actual (reportada el ${when}).</p></div>`;
+        })
+        .join("")
+    : `<p class="note">No has reportado ninguna pregunta todavía.</p>`;
+}
+
+function copyQualityReport() {
+  const revisionItems = REAL.filter((q) => q.status === "revision");
+  const reported = store.reportedIds;
+  const lines = [`Informe de calidad — Entrenador AENA — ${new Date().toLocaleString("es-ES")}`];
+  lines.push(`\nPendientes de revisión (${revisionItems.length}):`);
+  for (const q of revisionItems) lines.push(`- ${q.id}: ${q.notaRevision ?? "(sin nota)"}`);
+  lines.push(`\nReportadas por ti (${reported.length}):`);
+  for (const r of reported) {
+    const q = REAL.find((x) => x.id === r.id);
+    lines.push(`- ${r.id} (${new Date(r.ts).toLocaleDateString("es-ES")})${q ? `: "${q.prompt}"` : " — ya no existe en el banco"}`);
+  }
+  const text = lines.join("\n");
+  const status = $("q-copy-status");
+  navigator.clipboard?.writeText(text)
+    .then(() => { status.textContent = "Copiado al portapapeles."; })
+    .catch(() => { status.textContent = "No se pudo copiar automáticamente. Abre la consola del navegador y copia desde ahí."; console.log(text); });
 }
 
 /* ============================== navegación ============================== */
@@ -465,6 +540,7 @@ function goto(name) {
   if (name === "practice") renderPractice();
   if (name === "profile") renderProfile();
   if (name === "settings") renderSettings();
+  if (name === "quality") renderQuality();
   if (name === "speaking") { newPrompt(); resetSpeak(); }
   show(name);
 }
@@ -477,6 +553,20 @@ function init() {
     b.addEventListener("click", () => goto(b.dataset.nav)));
 
   $("p-review-btn").addEventListener("click", startReview);
+  $("settings-quality-btn").addEventListener("click", () => goto("quality"));
+  $("quality-back").addEventListener("click", () => goto("settings"));
+  $("q-copy-btn").addEventListener("click", copyQualityReport);
+  $("feedback-report").addEventListener("click", (e) => {
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    const list = store.reportedIds;
+    const existing = list.find((r) => r.id === id);
+    if (existing) existing.ts = Date.now();
+    else list.push({ id, ts: Date.now() });
+    store.reportedIds = list;
+    e.currentTarget.textContent = "✓ Reportado, gracias";
+    e.currentTarget.disabled = true;
+  });
 
   $("check-btn").addEventListener("click", evaluate);
   $("feedback-next").addEventListener("click", nextItem);

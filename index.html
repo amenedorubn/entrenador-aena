@@ -178,6 +178,11 @@
       <button type="button" class="link-btn danger-btn" id="reset-progress">Reiniciar todo el progreso</button>
     </div>
     <div class="card">
+      <div class="card__title">Calidad de preguntas</div>
+      <p class="note" id="q-summary">…</p>
+      <button type="button" class="link-btn" id="settings-quality-btn">Ver preguntas pendientes</button>
+    </div>
+    <div class="card">
       <div class="card__title">Acerca de</div>
       <p class="note">Diseño inspirado en Duolingo, sin afiliación ni contenido propietario. Tipografía Nunito (la original es propietaria). Preguntas numéricas, abstractas y verbales generadas por procedimiento: la respuesta correcta lo es por construcción.</p>
       <div class="row">
@@ -185,6 +190,29 @@
         <button type="button" class="link-btn" id="check-update">Buscar actualizaciones</button>
       </div>
       <p class="note" id="update-status" aria-live="polite"></p>
+    </div>
+  </main>
+</section>
+
+<!-- ============================ CALIDAD DE PREGUNTAS ============================ -->
+<section id="screen-quality" class="screen">
+  <main class="page container">
+    <button type="button" class="link-btn" id="quality-back">← Volver a Ajustes</button>
+    <h1 class="page__title">Calidad de preguntas</h1>
+    <div class="card">
+      <div class="card__title">Pendientes de revisión (<span id="q-revision-count">0</span>)</div>
+      <p class="note">La clave original no permitía determinar la respuesta correcta sin adivinar — quedaron fuera de las lecciones hasta revisarlas a mano.</p>
+      <div id="q-revision-list"></div>
+    </div>
+    <div class="card">
+      <div class="card__title">Reportadas por ti (<span id="q-reported-count">0</span>)</div>
+      <div id="q-reported-list"></div>
+    </div>
+    <div class="card">
+      <div class="card__title">Copiar informe</div>
+      <p class="note">Copia un resumen en texto de todo lo de arriba, para compartirlo.</p>
+      <button type="button" class="btn btn--blue btn--wide" id="q-copy-btn">Copiar informe</button>
+      <p class="note" id="q-copy-status" aria-live="polite"></p>
     </div>
   </main>
 </section>
@@ -206,6 +234,7 @@
       <div class="feedback__title"><span class="feedback__icon" id="feedback-icon" aria-hidden="true"></span><span id="feedback-head"></span></div>
       <p class="feedback__solution hidden" id="feedback-solution"></p>
       <p class="feedback__text" id="feedback-text"></p>
+      <button type="button" class="link-btn hidden" id="feedback-report">⚠️ Reportar fallo en esta pregunta</button>
       <button type="button" class="btn btn--green btn--wide" id="feedback-next">Continuar</button>
     </div>
   </div>
