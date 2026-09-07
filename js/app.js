@@ -612,6 +612,7 @@ function init() {
   });
 
   $("check-update").addEventListener("click", checkForUpdate);
+  $("force-update").addEventListener("click", hardResetApp);
   $("update-reload").addEventListener("click", () => window.location.reload());
 
   goto("path");
@@ -657,16 +658,43 @@ function checkForUpdate() {
   const statusEl = $("update-status");
   if (!swRegistration) { statusEl.textContent = "Todavía no hay una versión instalada para comparar."; return; }
   statusEl.textContent = "Buscando actualizaciones…";
+  // "updatefound" salta en cuanto el navegador compara byte a byte service-worker.js y
+  // ve que cambió -- eso es rápido (una petición de red), pase lo que pase después. NO
+  // esperar a que además termine de instalar+precachear (~24 ficheros: puede tardar
+  // varios segundos en 4G) para decidir si hay o no actualización -- ese fue el bug: un
+  // timeout corto decía "ya tienes la última" mientras la descarga seguía en marcha.
+  let found = false;
+  const onFound = () => {
+    found = true;
+    statusEl.textContent = "Hay una versión nueva descargándose… dale un momento, no cierres la app.";
+  };
+  swRegistration.addEventListener("updatefound", onFound, { once: true });
   swRegistration.update()
     .then(() => {
-      // Si había una nueva, dispara "controllerchange" (banner) en cuanto activa,
-      // normalmente en menos de un segundo. Si no, no hay nada más que decir.
       setTimeout(() => {
-        if (!$("update-banner").hidden) return;
-        statusEl.textContent = "Ya tienes la última versión.";
-      }, 1500);
+        swRegistration.removeEventListener("updatefound", onFound);
+        if (!found) statusEl.textContent = "Ya tienes la última versión.";
+      }, 4000);
     })
-    .catch(() => { statusEl.textContent = "No se pudo comprobar (sin conexión?)."; });
+    .catch(() => {
+      swRegistration.removeEventListener("updatefound", onFound);
+      statusEl.textContent = "No se pudo comprobar (¿sin conexión?).";
+    });
+}
+
+/** Vía de escape si, aun así, se queda pillada en una versión vieja: desregistra el
+ *  service worker, borra su caché y recarga desde cero. El progreso no se toca (vive
+ *  en localStorage, aparte de la caché del service worker). */
+function hardResetApp() {
+  if (!window.confirm("Esto fuerza una descarga completa de la app (no borra tu progreso). ¿Continuar?")) return;
+  const statusEl = $("update-status");
+  statusEl.textContent = "Forzando actualización…";
+  const done = () => window.location.reload();
+  if (!("serviceWorker" in navigator)) { done(); return; }
+  navigator.serviceWorker.getRegistrations()
+    .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+    .then(() => ("caches" in window ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))) : null))
+    .finally(done);
 }
 
 /* ============================== pantalla de acceso ============================== */
