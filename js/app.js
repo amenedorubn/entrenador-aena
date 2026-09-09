@@ -3,7 +3,8 @@ import {
   isPassed, lessonState, currentLessonIndex, unitProgress, worldProgress, worldUnlocked, totalPassed,
 } from "./curriculum.js";
 import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES } from "./content.js";
-import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speak, stopSpeech, optionText } from "./engine.js";
+import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speakItem, stopSpeech, optionText, transcriptText } from "./engine.js";
+import { LEVELS as LISTEN_LEVELS, LEVEL_LABEL as LISTEN_LEVEL_LABEL } from "../data/listening.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
 import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/competencias.js";
 import { loadReal, REAL } from "../data/real.js";
@@ -34,6 +35,15 @@ const store = {
   set examDate(v) { set("examDate", v); },
   get practiceTier() { return get("practiceTier", 3); },
   set practiceTier(v) { set("practiceTier", v); },
+  // Nivel de listening fijado en Práctica libre ("any" = por tier, como el resto de
+  // fuentes; "A".."D" fija el nivel exacto sin importar el tier -- ver Tarea 3).
+  get listenLevel() { return get("listenLevel", "any"); },
+  set listenLevel(v) { set("listenLevel", v); },
+  // Filtro de origen (Tarea 1): "todas" | "oficial" | "generada". Persistente, un único
+  // valor compartido por el selector de Práctica libre y el de Ajustes. Se aplica al
+  // camino (lecciones), Práctica libre y Repasar fallos por igual -- ver makeItem().
+  get origenFilter() { return get("origenFilter", "todas"); },
+  set origenFilter(v) { set("origenFilter", v); },
   // Ids de preguntas REALES falladas la última vez que se sirvieron, para "Repasar
   // fallos". Se quita un id en cuanto se responde bien (refleja lo que sigue
   // pendiente, no un historial de todo lo que alguna vez se falló).
@@ -156,7 +166,7 @@ function startLesson(index) {
   session.lessonIndex = index;
   session.practice = null;
   session.review = false;
-  session.items = buildLesson(l.sources, l.tier, QUESTIONS_PER_LESSON);
+  session.items = buildLesson(l.sources, l.tier, QUESTIONS_PER_LESSON, { origenFilter: store.origenFilter });
   beginSession(`Mundo ${l.worldIndex + 1} · Unidad ${l.unitIndex + 1} · Lección ${l.lessonIndex + 1}`);
 }
 
@@ -164,8 +174,13 @@ function startPractice(source, tier) {
   session.lessonIndex = null;
   session.practice = { source, tier };
   session.review = false;
-  session.items = buildLesson([source], tier, QUESTIONS_PER_LESSON);
-  beginSession(`Práctica libre · ${SOURCE_LABELS[source]} · nivel ${tier}`);
+  const opts = { origenFilter: store.origenFilter };
+  if (source === "listen" && store.listenLevel !== "any") opts.level = store.listenLevel;
+  session.items = buildLesson([source], tier, QUESTIONS_PER_LESSON, opts);
+  const kicker = opts.level
+    ? `Práctica libre · ${SOURCE_LABELS[source]} · ${LISTEN_LEVEL_LABEL[opts.level]}`
+    : `Práctica libre · ${SOURCE_LABELS[source]} · nivel ${tier}`;
+  beginSession(kicker);
 }
 
 /** Repasa exactamente las preguntas reales falladas la última vez (store.missedIds),
@@ -219,7 +234,7 @@ function renderCurrentItem() {
   check.disabled = true;
   check.textContent = "Comprobar";
 
-  renderQuestion(item, $("lesson-question"), speak);
+  renderQuestion(item, $("lesson-question"), speakItem);
   const answerEl = $("lesson-answer");
   if (item.kind === "wordbank") {
     renderWordbank(item, answerEl, (words) => {
@@ -232,7 +247,6 @@ function renderCurrentItem() {
       check.disabled = i === null;
     });
   }
-  if (item.kind === "listen") speak(item.audio);
 }
 
 function evaluate() {
@@ -284,7 +298,7 @@ function evaluate() {
   }
 
   let text = item.explanation ?? "";
-  if (item.kind === "listen") text += `<br><br><b>Transcripción:</b> ${item.audio}`;
+  if (item.kind === "listen") text += `<br><br><b>Transcripción:</b><br>${transcriptText(item)}`;
   $("feedback-text").innerHTML = text;
 
   const reportBtn = $("feedback-report");
@@ -371,6 +385,20 @@ function renderPractice() {
     .join("");
   $("practice-blocks").querySelectorAll("[data-practice]").forEach((b) =>
     b.addEventListener("click", () => startPractice(b.dataset.practice, store.practiceTier)));
+
+  const level = store.listenLevel;
+  document.querySelectorAll("#practice-listen-level button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.level === level)));
+
+  paintOrigenFilter("#practice-origen-filter");
+}
+
+/** Un mismo valor persistente (store.origenFilter), pintado en dos sitios (Práctica
+ *  libre y Ajustes) -- ver Tarea 1. */
+function paintOrigenFilter(selector) {
+  const val = store.origenFilter;
+  document.querySelectorAll(`${selector} button`).forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.origen === val)));
 }
 
 /* ============================== perfil ============================== */
@@ -471,6 +499,7 @@ function renderSettings() {
     b.setAttribute("aria-pressed", String((b.dataset.hearts === "on") === store.heartsOn)));
   $("exam-date").value = store.examDate;
   $("app-version").textContent = APP_VERSION;
+  paintOrigenFilter("#settings-origen-filter");
 
   const revisionCount = REAL.filter((q) => q.status === "revision").length;
   const reportedCount = store.reportedIds.length;
@@ -585,6 +614,14 @@ function init() {
 
   document.querySelectorAll("#practice-tier button").forEach((b) =>
     b.addEventListener("click", () => { store.practiceTier = Number(b.dataset.tier); renderPractice(); }));
+  document.querySelectorAll("#practice-listen-level button").forEach((b) =>
+    b.addEventListener("click", () => { store.listenLevel = b.dataset.level; renderPractice(); }));
+  document.querySelectorAll("#practice-origen-filter button, #settings-origen-filter button").forEach((b) =>
+    b.addEventListener("click", () => {
+      store.origenFilter = b.dataset.origen;
+      paintOrigenFilter("#practice-origen-filter");
+      paintOrigenFilter("#settings-origen-filter");
+    }));
 
   $("comp-start-likert").addEventListener("click", () => startCompetencias("likert"));
   $("comp-start-forced").addEventListener("click", () => startCompetencias("forced"));

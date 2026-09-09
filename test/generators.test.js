@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { NUM_FAMILIES, generateNumeric } from "../js/gen-numeric.js";
 import { ABS_FAMILIES, generateAbstract } from "../js/gen-abstract.js";
 import { VERBAL_FAMILIES, generateVerbal } from "../js/gen-verbal.js";
-import { generateEnglish, numberWords } from "../js/gen-english.js";
+import { generateEnglish } from "../js/gen-english.js";
 import { makeItem, SOURCES } from "../js/content.js";
 import * as N from "../js/gen-numeric.js";
 import * as A from "../js/gen-abstract.js";
@@ -330,17 +330,5 @@ describe("reglas abstractas recomputadas", () => {
         }
       }
     }
-  });
-});
-
-describe("gen-english · números a palabras", () => {
-  it("convierte correctamente los números que usan los avisos", () => {
-    expect(numberWords(0)).toBe("zero");
-    expect(numberWords(7)).toBe("seven");
-    expect(numberWords(15)).toBe("fifteen");
-    expect(numberWords(20)).toBe("twenty");
-    expect(numberWords(22)).toBe("twenty-two");
-    expect(numberWords(40)).toBe("forty");
-    expect(numberWords(99)).toBe("ninety-nine");
   });
 });

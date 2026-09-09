@@ -145,33 +145,65 @@ const SYLLOGISMS = [
     why: (A, B) => `Falacia de <b>afirmación del consecuente</b>: que todos ${A} sean ${B} no implica que todo ${B.replace("los ", "")} sea de ${A}.` },
 ];
 
-const CONDITIONALS = [
-  { tier: 3, premises: `Si hay niebla, se desvían los vuelos. Hoy hay niebla.`,
-    correct: `Hoy se desvían los vuelos`,
-    wrong: [`Hoy no se desvían los vuelos`, `No se deduce nada con certeza`, `Siempre que se desvían vuelos hay niebla`],
-    why: `<b>Modus ponens</b>: afirmado el antecedente, se sigue el consecuente.` },
-  { tier: 4, premises: `Si hay niebla, se desvían los vuelos. Hoy NO se han desviado los vuelos.`,
-    correct: `Hoy no hay niebla`,
-    wrong: [`Hoy hay niebla`, `No se deduce nada con certeza`, `La niebla no afecta a los vuelos`],
-    why: `<b>Modus tollens</b>: negado el consecuente, se niega el antecedente.` },
-  { tier: 4, premises: `Si hay niebla, se desvían los vuelos. Hoy NO hay niebla.`,
-    correct: `No se deduce nada sobre si se desvían los vuelos`,
-    wrong: [`Hoy no se desvían los vuelos`, `Hoy se desvían los vuelos`, `Nunca se desvían vuelos sin niebla`],
-    why: `Falacia de <b>negación del antecedente</b>: los vuelos podrían desviarse por otras causas (viento, huelga…).` },
-  { tier: 5, premises: `Si se desvían los vuelos, hay niebla o viento fuerte. Hoy se han desviado y no hay viento fuerte.`,
-    correct: `Hoy hay niebla`,
-    wrong: [`Hoy no hay niebla`, `No se deduce nada con certeza`, `Hoy hay viento fuerte`],
-    why: `<b>Silogismo disyuntivo</b>: si se cumple «niebla o viento» y se descarta el viento, queda la niebla.` },
+// Escenarios para los 4 patrones lógicos de abajo, repartidos entre 9 dominios (ver
+// data/contextos.js) -- aeropuerto es UNO más, no el único, para no entrenar siempre el
+// mismo contexto (ver Tarea 2 del encargo). Cada escenario da pNeg/qNeg ya redactados
+// (en vez de negar con un string-surgery genérico) porque "no " no siempre se antepone
+// igual en español ("no hay niebla" pero "el campo no está helado"): así cada frase sale
+// gramaticalmente correcta sin necesitar un negador morfológico.
+const CONDITIONAL_SCENARIOS = [
+  { domain: "meteorologia", p: "hiela por la noche", pNeg: "no hiela por la noche",
+    q: "se cubren los semilleros", qNeg: "no se cubren los semilleros", altCause: "la previsión de granizo" },
+  { domain: "deporte", p: "el campo está encharcado", pNeg: "el campo no está encharcado",
+    q: "se aplaza el partido", qNeg: "no se aplaza el partido", altCause: "la falta de árbitro" },
+  { domain: "transporte", p: "hay huelga de conductores", pNeg: "no hay huelga de conductores",
+    q: "se cancelan las líneas de autobús", qNeg: "no se cancelan las líneas de autobús", altCause: "una avería en la cochera" },
+  { domain: "sanidad", p: "un paciente tiene fiebre alta", pNeg: "un paciente no tiene fiebre alta",
+    q: "se le hacen análisis de sangre", qNeg: "no se le hacen análisis de sangre", altCause: "un dolor persistente" },
+  { domain: "biblioteca", p: "un libro está reservado", pNeg: "un libro no está reservado",
+    q: "no se puede sacar en préstamo", qNeg: "se puede sacar en préstamo", altCause: "que esté deteriorado" },
+  { domain: "obra", p: "falla la grúa", pNeg: "no falla la grúa",
+    q: "se paraliza la obra", qNeg: "no se paraliza la obra", altCause: "la falta de material" },
+  { domain: "hosteleria", p: "el restaurante está completo", pNeg: "el restaurante no está completo",
+    q: "se apunta al cliente en la lista de espera", qNeg: "no se apunta al cliente en la lista de espera", altCause: "que no haya reserva" },
+  { domain: "banca", p: "una transferencia supera los 10 000 €", pNeg: "una transferencia no supera los 10 000 €",
+    q: "se revisa manualmente", qNeg: "no se revisa manualmente", altCause: "que la cuenta sea nueva" },
+  { domain: "aeropuerto", p: "hay niebla", pNeg: "no hay niebla",
+    q: "se desvían los vuelos", qNeg: "no se desvían los vuelos", altCause: "el viento fuerte" },
+];
+
+const CONDITIONAL_TEMPLATES = [
+  { tier: 3, mode: "mp",
+    premises: (s) => `Si ${s.p}, ${s.q}. Hoy ${s.p}.`,
+    correct: (s) => `Hoy ${s.q}`,
+    wrong: (s) => [`Hoy ${s.qNeg}`, `No se deduce nada con certeza`, `Siempre que ${s.q} es porque ${s.p}`],
+    why: () => `<b>Modus ponens</b>: afirmado el antecedente, se sigue el consecuente.` },
+  { tier: 4, mode: "mt",
+    premises: (s) => `Si ${s.p}, ${s.q}. Hoy ${s.qNeg}.`,
+    correct: (s) => `Hoy ${s.pNeg}`,
+    wrong: (s) => [`Hoy ${s.p}`, `No se deduce nada con certeza`, `Que ${s.q} nunca depende de que ${s.p}`],
+    why: () => `<b>Modus tollens</b>: negado el consecuente, se niega el antecedente.` },
+  { tier: 4, mode: "da",
+    premises: (s) => `Si ${s.p}, ${s.q}. Hoy ${s.pNeg}.`,
+    correct: (s) => `No se deduce nada sobre si ${s.q}`,
+    wrong: (s) => [`Hoy ${s.qNeg}`, `Hoy ${s.q}`, `Nunca ocurre que ${s.q} sin que ${s.p}`],
+    why: () => `Falacia de <b>negación del antecedente</b>: el consecuente podría darse igualmente por otra causa.` },
+  { tier: 5, mode: "ds",
+    premises: (s) => `Si ${s.q}, ${s.p} o ${s.altCause}. Hoy ${s.q} y no se da que ${s.altCause}.`,
+    correct: (s) => `Hoy ${s.p}`,
+    wrong: (s) => [`Hoy ${s.pNeg}`, `No se deduce nada con certeza`, `Hoy se da que ${s.altCause}`],
+    why: () => `<b>Silogismo disyuntivo</b>: cumplida la disyunción y descartada una opción, queda la otra.` },
 ];
 
 export function syllogismItem(tier = 3) {
   const useConditional = Math.random() < 0.4;
   if (useConditional) {
-    const pool = CONDITIONALS.filter((c) => Math.abs(c.tier - tier) <= 1);
-    const c = choice(pool.length ? pool : CONDITIONALS);
-    const mixed = shuffle([{ t: c.correct, ok: true }, ...c.wrong.map((t) => ({ t, ok: false }))]);
-    return item({ family: "logic", tier, prompt: `«${c.premises}» ¿Qué se deduce <b>con certeza</b>?`,
-      options: mixed.map((x) => x.t), correctIndex: mixed.findIndex((x) => x.ok), value: c.correct, explanation: c.why });
+    const pool = CONDITIONAL_TEMPLATES.filter((c) => Math.abs(c.tier - tier) <= 1);
+    const t = choice(pool.length ? pool : CONDITIONAL_TEMPLATES);
+    const s = choice(CONDITIONAL_SCENARIOS);
+    const mixed = shuffle([{ t: t.correct(s), ok: true }, ...t.wrong(s).map((w) => ({ t: w, ok: false }))]);
+    return item({ family: "logic", tier, prompt: `«${t.premises(s)}» ¿Qué se deduce <b>con certeza</b>?`,
+      options: mixed.map((x) => x.t), correctIndex: mixed.findIndex((x) => x.ok), value: t.correct(s), explanation: t.why(s) });
   }
   const pool = SYLLOGISMS.filter((s) => Math.abs(s.tier - tier) <= 1);
   const f = choice(pool.length ? pool : SYLLOGISMS);

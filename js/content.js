@@ -5,7 +5,8 @@ import { generateVerbal } from "./gen-verbal.js";
 import { grammarItem, translateItem, listeningItem, errorItem } from "./gen-english.js";
 import { SJT } from "../data/sjt.js";
 import { REAL, FIGURE_CATEGORIES, CATEGORY_SOURCE } from "../data/real.js";
-import { choice, shuffle } from "./rng.js";
+import { choice, shuffle, shuffleBankOptions, ShuffleIntegrityError } from "./rng.js";
+import { optionText } from "./engine.js";
 
 // Fuente del curso -> categorías reales que puede servir (inverso de CATEGORY_SOURCE).
 const SOURCE_CATEGORIES = {};
@@ -70,7 +71,20 @@ function buildRealQueue(cats, tier) {
 // Una pregunta es "figura" si su categoría lo es por defecto (matrices, dominó...) o si
 // trae imagen propia aunque su categoría no esté en FIGURE_CATEGORIES (p. ej. las
 // preguntas numéricas que citan un gráfico de barras, o secuencia_num_letras).
+// Blindaje de integridad: REAL no baraja sus opciones (se muestran en el orden
+// almacenado), así que aquí no hace falta shuffleBankOptions -- pero si el ítem trae
+// `correctText` (snapshot de qué opción era la correcta, ver scripts/validate-questions.mjs)
+// se comprueba igualmente que sigue coincidiendo con options[correctIndex]. Un desajuste
+// (dato corrupto tras el descifrado, o editado a mano sin actualizar correctText) no se
+// sirve: se registra en consola y se devuelve null para que pickReal descarte ese id.
 function toRealItem(q, source, tier) {
+  if (q.correctText !== undefined && q.correctText !== null) {
+    const got = optionText(q.options[q.correctIndex]);
+    if (got !== q.correctText) {
+      console.error(`[integridad] "${q.id}": options[correctIndex] no coincide con correctText ("${got}" ≠ "${q.correctText}"). Se descarta la pregunta.`);
+      return null;
+    }
+  }
   const isFigure = FIGURE_CATEGORIES.has(q.category) || Boolean(q.image);
   const explanation = q.explanation?.trim().length
     ? q.explanation
@@ -81,6 +95,11 @@ function toRealItem(q, source, tier) {
     options: q.options, correctIndex: q.correctIndex, value: q.options[q.correctIndex],
     explanation,
     isReal: true, confidence: q.confidence, sourceFile: q.sourceFile,
+    // origen viene siempre "oficial" en REAL (ver Tarea 1); se propaga tal cual en vez
+    // de fijarlo aquí para que el validador de data/real.source.js sea quien de verdad
+    // exija el campo -- si faltara, este item saldría con origen undefined y los tests
+    // de esquema lo detectarían.
+    origen: q.origen, origenId: q.origenId ?? null,
   };
 }
 
@@ -90,15 +109,14 @@ function pickReal(source, tier, dedupe) {
   if (Math.random() >= REAL_CHANCE) return null;
 
   const queue = (dedupe.realQueues[source] ??= buildRealQueue(cats, tier));
-  let q = null;
   while (queue.length) {
     const candidate = queue.shift();
-    if (!dedupe.usedIds.has(candidate.id)) { q = candidate; break; }
+    if (dedupe.usedIds.has(candidate.id)) continue;
+    dedupe.usedIds.add(candidate.id);
+    const real = toRealItem(candidate, source, tier);
+    if (real) return real; // si falla la integridad, toRealItem ya lo registró: se prueba el siguiente de la cola
   }
-  if (!q) return null; // pool agotado para esta fuente en esta lección -> toca generar
-
-  dedupe.usedIds.add(q.id);
-  return toRealItem(q, source, tier);
+  return null; // pool agotado (o sin ítems íntegros) para esta fuente en esta lección -> toca generar
 }
 
 /**
@@ -111,22 +129,26 @@ function pickReal(source, tier, dedupe) {
 export function buildReviewLesson(ids) {
   const wanted = new Set(ids);
   const items = REAL.filter((q) => wanted.has(q.id) && q.status !== "revision");
-  return shuffle(items.map((q) => toRealItem(q, CATEGORY_SOURCE[q.category], q.lvl ?? 3)));
+  return shuffle(items.map((q) => toRealItem(q, CATEGORY_SOURCE[q.category], q.lvl ?? 3)).filter(Boolean));
 }
 
 function sjtItem(tier = 3) {
-  const near = SJT.filter((x) => Math.abs(x.lvl - tier) <= 1);
-  const it = choice(near.length ? near : SJT);
-  const tagged = it.options.map((t, i) => ({ t, ok: i === it.correctIndex }));
-  const mixed = shuffle(tagged);
-  return {
-    kind: "sjt", block: "sjt", tier, family: it.competency,
-    prompt: it.prompt,
-    options: mixed.map((x) => x.t),
-    correctIndex: mixed.findIndex((x) => x.ok),
-    value: it.options[it.correctIndex],
-    explanation: it.explanation,
-  };
+  const pool = SJT.filter((x) => Math.abs(x.lvl - tier) <= 1);
+  const source = pool.length ? pool : SJT;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const it = choice(source);
+    try {
+      const { options, correctIndex } = shuffleBankOptions(it.options, it.correctIndex, it.correctText, it.id);
+      return {
+        kind: "sjt", block: "sjt", tier, family: it.competency,
+        prompt: it.prompt, options, correctIndex, value: it.options[it.correctIndex],
+        explanation: it.explanation, origen: it.origen, origenId: it.origenId ?? null,
+      };
+    } catch (e) {
+      if (!(e instanceof ShuffleIntegrityError)) throw e;
+    }
+  }
+  throw new Error("sjtItem: no se pudo servir ninguna pregunta íntegra tras varios intentos.");
 }
 
 export const SOURCES = {
@@ -152,9 +174,9 @@ const GENERATE_RETRIES = 10;
  * servido ya en esta sesión (hasta GENERATE_RETRIES intentos). Si no lo consigue,
  * devuelve null: quien llama debe descartar esa pregunta, nunca repetirla.
  */
-function generateUnique(fn, tier, dedupe) {
+function generateUnique(fn, tier, dedupe, opts) {
   for (let attempt = 0; attempt < GENERATE_RETRIES; attempt++) {
-    const item = fn(tier);
+    const item = fn(tier, opts);
     const sig = itemSignature(item);
     if (!dedupe.usedSignatures.has(sig)) {
       dedupe.usedSignatures.add(sig);
@@ -171,18 +193,33 @@ function generateUnique(fn, tier, dedupe) {
  * como antes: sin garantía de no-repetición entre llamadas independientes). Devuelve
  * null si no hay nada servible sin repetir (pool real agotado y generador sin salida
  * tras GENERATE_RETRIES intentos): quien llama debe descartar la pregunta, no rellenar
- * repitiendo.
+ * repitiendo. `opts` se pasa tal cual al generador (p. ej. { level: "C" } para forzar
+ * un nivel de listening concreto desde el selector de Práctica libre, ver app.js) --
+ * los generadores que no lo usan simplemente lo ignoran. `opts.origenFilter`
+ * ("oficial"|"generada"|"todas", Tarea 1) filtra qué puede servirse: "oficial" nunca
+ * genera (si el pool real está vacío o agotado, la pregunta se descarta, nunca se
+ * rellena con una generada), "generada" nunca sirve REAL. Sin origenFilter (o "todas")
+ * se comporta como siempre.
  */
-export function makeItem(source, tier, dedupe = newDedupeSession()) {
-  const real = pickReal(source, tier, dedupe);
+export function makeItem(source, tier, dedupe = newDedupeSession(), opts = {}) {
+  const filter = opts.origenFilter ?? "todas";
+  const real = filter !== "generada" ? pickReal(source, tier, dedupe) : null;
   if (real) {
     dedupe.usedSignatures.add(itemSignature(real));
     return { ...real, source };
   }
+  if (filter === "oficial") return null;
   const fn = SOURCES[source];
   if (!fn) throw new Error(`Fuente desconocida: ${source}`);
-  const generated = generateUnique(fn, tier, dedupe);
-  return generated ? { ...generated, source } : null;
+  const generated = generateUnique(fn, tier, dedupe, opts);
+  if (!generated) return null;
+  // Tarea 1: origen es obligatorio en todo ítem servido. Los generadores que salen de
+  // un banco propio (sjtItem, grammarItem, listeningItem...) ya traen su origen real
+  // desde el registro del banco; los puramente procedurales (series numéricas,
+  // figuras, sinónimos...) no lo fijan porque siempre son "generada" -- se rellena
+  // aquí, en el único punto por el que pasa TODO ítem no-real, en vez de tocar cada
+  // generador uno a uno.
+  return { ...generated, source, origen: generated.origen ?? "generada" };
 }
 
 /**
@@ -192,11 +229,11 @@ export function makeItem(source, tier, dedupe = newDedupeSession()) {
  * variantes nuevas), la lección sale más corta: nunca se repite una pregunta para
  * rellenar el hueco. Se baraja el orden final para que la lección no vaya por bloques.
  */
-export function buildLesson(sources, tier, n = 10) {
+export function buildLesson(sources, tier, n = 10, opts = {}) {
   const dedupe = newDedupeSession();
   const out = [];
   for (let i = 0; i < n; i++) {
-    const item = makeItem(sources[i % sources.length], tier, dedupe);
+    const item = makeItem(sources[i % sources.length], tier, dedupe, opts);
     if (item) out.push(item);
   }
   return shuffle(out);

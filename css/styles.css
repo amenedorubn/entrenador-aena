@@ -281,12 +281,20 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--yellow-dark); background: var(--yellow-soft, #fff6d9); border: 2px solid var(--yellow);
   border-radius: 999px; padding: 4px 10px; margin-bottom: 10px;
 }
-/* Ítems de figura GENERADOS (reloj, dominó, matrices...): mismo formato de píldora que
-   .badge-real a propósito -- para que la marca se note igual de claro -- pero en gris
-   neutro, para no confundirla con la dorada de "esto sí cayó en un examen real". */
+/* Ítems GENERADOS desde cero (Tarea 1): mismo formato de píldora que .badge-real a
+   propósito -- para que la marca se note igual de claro -- pero en gris neutro, para no
+   confundirla con la dorada de "esto sí cayó en un examen real". */
 .badge-generated {
   display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
   color: var(--muted); background: var(--surface-2); border: 2px solid var(--border-strong);
+  border-radius: 999px; padding: 4px 10px; margin-bottom: 10px;
+}
+/* Ítems VARIANTE (parametrizados a partir de un ítem oficial, ver origenId): mismo
+   formato otra vez, en azul -- entre el oro de "oficial" y el gris de "generada desde
+   cero", nunca confundible con ninguna de las dos. */
+.badge-variante {
+  display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--blue-dark); background: var(--blue-soft); border: 2px solid var(--blue);
   border-radius: 999px; padding: 4px 10px; margin-bottom: 10px;
 }
 .figreal { margin: 16px 0; }
