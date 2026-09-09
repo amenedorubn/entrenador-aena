@@ -86,6 +86,36 @@ export function buildOptions(correctVal, makeDistractor, format = String, fallba
   };
 }
 
+/**
+ * Blindaje de integridad (ver CLAUDE.md / auditoría de esquema): baraja las opciones
+ * de un ítem de banco estático (options[] + correctIndex) conservando cuál es la
+ * correcta -- mismo patrón que el resto del código (se etiqueta cada opción con si es
+ * la correcta ANTES de barajar y se recalcula el índice DESPUÉS con findIndex, nunca se
+ * barajan índices sueltos). Si el ítem trae `expectedText` (el campo `correctText`
+ * guardado junto a correctIndex en los bancos estáticos, snapshot de qué opción era la
+ * correcta en origen), se comprueba tras barajar que options[correctIndex] sigue siendo
+ * esa misma opción. Un desajuste (dato editado a mano sin mantener correctText al día,
+ * o un bug futuro en el shuffle) no se sirve nunca a la UI: se registra en consola con
+ * el id del ítem y se lanza ShuffleIntegrityError para que quien llama lo descarte y
+ * sirva otra cosa, en vez de arriesgarse a pintar una pregunta con la clave equivocada.
+ */
+export class ShuffleIntegrityError extends Error {}
+
+export function shuffleBankOptions(options, correctIndex, expectedText, idForLog = "?") {
+  const tagged = options.map((t, i) => ({ t, ok: i === correctIndex }));
+  const mixed = shuffle(tagged);
+  const newOptions = mixed.map((x) => x.t);
+  const newCorrectIndex = mixed.findIndex((x) => x.ok);
+  if (expectedText !== undefined && expectedText !== null) {
+    const got = typeof newOptions[newCorrectIndex] === "string" ? newOptions[newCorrectIndex] : (newOptions[newCorrectIndex]?.text ?? "");
+    if (got !== expectedText) {
+      console.error(`[integridad] "${idForLog}": tras barajar, la opción correcta no coincide con correctText ("${got}" ≠ "${expectedText}"). Se descarta la pregunta.`);
+      throw new ShuffleIntegrityError(String(idForLog));
+    }
+  }
+  return { options: newOptions, correctIndex: newCorrectIndex };
+}
+
 /** Igual que buildOptions pero conservando objetos (specs de figura) sin formatear. */
 export function buildFigureOptions(correctSpec, makeDistractor) {
   const key = (s) => JSON.stringify(s);
