@@ -13,3 +13,9 @@ data/raw_extracted/
 # data/real.enc.json (cifrado con AES-GCM, ver scripts/encrypt.mjs).
 data/real.source.js
 data/real.plain.json
+
+# Informes que citan texto literal de preguntas reales como ejemplo (inventario de
+# semillas, muestras de variantes lado a lado...): mismo motivo que real.source.js, no
+# deben llegar a un repo público. Los que NO citan texto (questions-audit.md) sí se suben.
+reports/SEMILLAS.md
+reports/MUESTRA_VARIANTES.md
