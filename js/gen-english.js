@@ -1,34 +1,57 @@
 // Fase 3 · Generadores de inglés.
-// Grammar / error correction / listening curado salen de bancos; los avisos de
-// listening numéricos y las frases de producción se generan por procedimiento.
-import { GRAMMAR, TRANSLATE, ERROR_CORRECTION, LISTENING } from "../data/english.js";
-import { randInt, choice, shuffle, buildOptions } from "./rng.js";
+// Grammar / error correction / producción escrita salen de bancos estáticos. El
+// listening también sale de un banco -- ver data/listening.js y su cabecera: la Tarea
+// 3 del encargo retiró los generadores por procedimiento que había aquí antes
+// (listenGate/listenDelay/listenReason/listenDesk/listenShuttle) porque eran 100 %
+// aeropuerto, con la respuesta repitiendo literalmente el audio, sin acentos, sin
+// niveles y demasiado cortos para pasar por B1 real. El banco nuevo cumple las reglas
+// duras de esa tarea (ver scripts/validar-listening.mjs) y no se puede generar por
+// procedimiento con esa calidad sin un modelo de lenguaje -- así que es banco curado,
+// como GRAMMAR/ERROR_CORRECTION.
+import { GRAMMAR, TRANSLATE, ERROR_CORRECTION } from "../data/english.js";
+import { LISTENING } from "../data/listening.js";
+import { choice, shuffle, shuffleBankOptions, ShuffleIntegrityError } from "./rng.js";
 
 const near = (arr, tier) => {
   const p = arr.filter((x) => Math.abs(x.lvl - tier) <= 1);
   return p.length ? p : arr;
 };
 
-/** Baraja las opciones de un ítem de banco conservando cuál es la correcta. */
+/**
+ * Baraja las opciones de un ítem de banco conservando cuál es la correcta, con
+ * blindaje de integridad vía shuffleBankOptions (ver js/rng.js): si correctText no
+ * coincide tras barajar, no se sirve -- se relanza para que la fábrica de arriba
+ * (grammarItem/errorItem) reintente con otro ítem del banco.
+ */
 function shuffledBankItem(it, kind, block, tier) {
-  const tagged = it.options.map((t, i) => ({ t, ok: i === it.correctIndex }));
-  const mixed = shuffle(tagged);
+  const { options, correctIndex } = shuffleBankOptions(it.options, it.correctIndex, it.correctText, it.id);
   return {
     kind, block, tier, family: it.id.replace(/\d+$/, ""),
     prompt: it.prompt, audio: it.audio,
-    options: mixed.map((x) => x.t),
-    correctIndex: mixed.findIndex((x) => x.ok),
+    options, correctIndex,
     value: it.options[it.correctIndex],
-    explanation: it.explanation,
+    explanation: it.explanation, origen: it.origen, origenId: it.origenId ?? null,
   };
 }
 
+/** Reintenta con otro ítem del pool si shuffledBankItem descarta uno por integridad. */
+function pickBankItem(pool, kind, block, tier) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return shuffledBankItem(choice(pool), kind, block, tier);
+    } catch (e) {
+      if (!(e instanceof ShuffleIntegrityError)) throw e;
+    }
+  }
+  throw new Error("pickBankItem: no se pudo servir ningún ítem íntegro tras varios intentos.");
+}
+
 export function grammarItem(tier = 3) {
-  return shuffledBankItem(choice(near(GRAMMAR, tier)), "text", "grammar", tier);
+  return pickBankItem(near(GRAMMAR, tier), "text", "grammar", tier);
 }
 
 export function errorItem(tier = 3) {
-  return shuffledBankItem(choice(near(ERROR_CORRECTION, tier)), "text", "grammar", tier);
+  return pickBankItem(near(ERROR_CORRECTION, tier), "text", "grammar", tier);
 }
 
 /** Producción escrita: construir la frase con fichas (tipo Duolingo). */
@@ -41,93 +64,42 @@ export function translateItem(tier = 3) {
     tokens, answer: t.answer,
     value: t.answer.join(" "),
     explanation: `Respuesta: <b>${t.answer.join(" ")}</b>.`,
+    origen: t.origen, origenId: t.origenId ?? null,
   };
 }
 
-/* ------------------------- listening por procedimiento ------------------------- */
+/* ---------------------------------- listening ---------------------------------- */
 
-const ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
-const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
-
-/** Número (0-99) a palabras en inglés — para que el sintetizador lo lea con claridad. */
-export function numberWords(n) {
-  if (n < 20) return ONES[n];
-  const t = Math.floor(n / 10), u = n % 10;
-  return u === 0 ? TENS[t] : `${TENS[t]}-${ONES[u]}`;
+/** Igual que shuffledBankItem pero conserva los campos propios del listening (nivel,
+ *  acento(s), turnos multivoz, tipo de pregunta) que engine.js necesita para
+ *  reproducir el audio y pintar el badge de nivel. */
+function listeningBankItem(it, tier) {
+  const { options, correctIndex } = shuffleBankOptions(it.options, it.correctIndex, it.correctText, it.id);
+  return {
+    kind: "listen", block: "listen", tier, family: it.id,
+    prompt: it.prompt, audio: it.audio, turns: it.turns, accent: it.accent,
+    level: it.level, speakers: it.speakers, questionType: it.questionType,
+    options, correctIndex,
+    value: it.options[it.correctIndex],
+    explanation: it.explanation, origen: it.origen, origenId: it.origenId ?? null,
+  };
 }
 
-const CITIES = ["Barcelona", "Lisbon", "Dublin", "Amsterdam", "Rome", "Vienna", "Copenhagen", "Manchester", "Frankfurt", "Oslo"];
-const REASONS = [
-  { audio: "strong winds", q: "strong winds", alt: ["fog", "a technical fault", "a strike"] },
-  { audio: "dense fog", q: "fog", alt: ["strong winds", "a bird strike", "a medical emergency"] },
-  { audio: "a technical inspection", q: "a technical inspection", alt: ["bad weather", "a security alert", "a staff shortage"] },
-  { audio: "a security alert", q: "a security alert", alt: ["dense fog", "a technical fault", "heavy snow"] },
-  { audio: "heavy snow", q: "heavy snow", alt: ["strong winds", "a strike", "a runway closure"] },
-];
-
-function listenGate(tier) {
-  const gate = randInt(1, 45), city = choice(CITIES), num = randInt(100, 899);
-  const audio = `Passengers for flight I B ${numberWords(num % 100)} to ${city}, please proceed to gate ${numberWords(gate)}. Boarding is now in progress.`;
-  const { options, correctIndex } = buildOptions(gate, () => {
-    const d = gate + choice([-20, -10, -3, -1, 1, 3, 10, 20]);
-    return d >= 1 && d <= 60 ? d : null;
-  }, (x) => `Gate ${x}`);
-  return { kind: "listen", block: "listen", tier, family: "gate", audio, prompt: `Which gate should passengers go to?`,
-    options, correctIndex, value: `Gate ${gate}`, explanation: `«proceed to gate ${numberWords(gate)}» → puerta <b>${gate}</b>.` };
-}
-
-function listenDelay(tier) {
-  const mins = choice([15, 20, 25, 30, 40, 45, 50, 55, 70, 90]);
-  const city = choice(CITIES), r = choice(REASONS);
-  const audio = `We regret to announce that the service to ${city} is delayed by ${numberWords(mins)} minutes due to ${r.audio}.`;
-  const { options, correctIndex } = buildOptions(mins, () => {
-    const d = choice([mins + 10, mins - 10, mins + 5, mins - 5, Math.round(mins / 10), mins * 2]);
-    return d > 0 && d <= 180 ? d : null;
-  }, (x) => `${x} minutes`);
-  return { kind: "listen", block: "listen", tier, family: "delay", audio, prompt: `How long is the flight delayed?`,
-    options, correctIndex, value: `${mins} minutes`, explanation: `«delayed by ${numberWords(mins)} minutes» → <b>${mins} minutos</b>.` };
-}
-
-function listenReason(tier) {
-  const r = choice(REASONS), city = choice(CITIES);
-  const audio = `Due to ${r.audio}, the departure to ${city} has been postponed. We apologise for the inconvenience.`;
-  const mixed = shuffle([{ t: r.q, ok: true }, ...r.alt.map((t) => ({ t, ok: false }))]);
-  return { kind: "listen", block: "listen", tier, family: "reason", audio, prompt: `Why has the departure been postponed?`,
-    options: mixed.map((x) => x.t), correctIndex: mixed.findIndex((x) => x.ok), value: r.q,
-    explanation: `«Due to ${r.audio}» → <b>${r.q}</b>.` };
-}
-
-function listenDesk(tier) {
-  const desk = randInt(1, 40), hour = randInt(6, 11);
-  const audio = `Passengers with checked baggage must drop their bags at desk ${numberWords(desk)} before ${numberWords(hour)} a m.`;
-  const { options, correctIndex } = buildOptions(desk, () => {
-    const d = desk + choice([-20, -10, -2, -1, 1, 2, 10, 20]);
-    return d >= 1 && d <= 60 ? d : null;
-  }, (x) => `Desk ${x}`);
-  return { kind: "listen", block: "listen", tier, family: "desk", audio, prompt: `Where must checked bags be dropped?`,
-    options, correctIndex, value: `Desk ${desk}`, explanation: `«drop their bags at desk ${numberWords(desk)}» → mostrador <b>${desk}</b>.` };
-}
-
-function listenShuttle(tier) {
-  const every = choice([5, 10, 12, 15, 20, 25, 30]), term = randInt(1, 4);
-  const audio = `The shuttle bus to terminal ${numberWords(term)} departs every ${numberWords(every)} minutes from the stop outside arrivals.`;
-  const { options, correctIndex } = buildOptions(every, () => {
-    const d = choice([every + 5, every - 5, every * 2, Math.round(every / 5), every + 10]);
-    return d > 0 && d <= 120 ? d : null;
-  }, (x) => `Every ${x} minutes`);
-  return { kind: "listen", block: "listen", tier, family: "shuttle", audio, prompt: `How often does the shuttle depart?`,
-    options, correctIndex, value: `Every ${every} minutes`, explanation: `«every ${numberWords(every)} minutes» → cada <b>${every} minutos</b>.` };
-}
-
-const LISTEN_GENERATORS = [listenGate, listenDelay, listenReason, listenDesk, listenShuttle];
-
-export function listeningItem(tier = 3) {
-  // A partir de tier 3 se mezclan avisos curados (más largos) con los generados.
-  if (tier >= 3 && Math.random() < 0.5) {
-    return shuffledBankItem(choice(near(LISTENING, tier)), "listen", "listen", tier);
+/**
+ * `opts.level` ("A"|"B"|"C"|"D"), cuando se pasa (selector de Práctica libre, ver
+ * app.js), filtra el banco a ese nivel exacto en vez de usar el tier del curso. Sin
+ * `opts.level`, se filtra por tier como el resto de fuentes (near()).
+ */
+export function listeningItem(tier = 3, opts = {}) {
+  const pool = opts.level ? LISTENING.filter((x) => x.level === opts.level) : near(LISTENING, tier);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return listeningBankItem(choice(pool.length ? pool : LISTENING), tier);
+    } catch (e) {
+      if (!(e instanceof ShuffleIntegrityError)) throw e;
+    }
   }
-  return choice(LISTEN_GENERATORS)(tier);
+  throw new Error("listeningItem: no se pudo servir ningún ítem íntegro tras varios intentos.");
 }
 
 /* --------------------------- registro por tier --------------------------- */

@@ -85,16 +85,20 @@ export function fig(spec) {
 }
 
 /* ------------------------------- enunciado ------------------------------- */
-const REAL_BADGE = `<span class="badge-real" title="Pregunta tal cual apareció en una convocatoria oficial">REAL · examen oficial</span>`;
-// Mismo tratamiento visual que REAL_BADGE (una píldora, igual de visible) pero en gris:
-// las figuras generadas (reloj, dominó, matrices...) pueden parecerse mucho a las
-// reales del banco -- que no se confundan una con otra a simple vista.
-const GENERATED_BADGE = `<span class="badge-generated" title="Pregunta generada automáticamente para practicar, no es del examen real">Generada · práctica</span>`;
+// Tarea 1: TODO ítem no oficial lleva badge, siempre, no solo las figuras generadas
+// (antes era la única categoría marcada aparte de REAL) -- que nunca se estudie sin
+// saber si lo que hay delante es un examen real, una variante de uno, o inventado
+// desde cero. Las tres píldoras comparten formato (mismo tamaño/posición) para que se
+// note igual de claro, pero con color propio: oro=oficial, azul=variante, gris=generada.
+const BADGE_BY_ORIGEN = {
+  oficial: `<span class="badge-real" title="Pregunta tal cual apareció en una convocatoria oficial">REAL · EXAMEN OFICIAL</span>`,
+  variante: `<span class="badge-variante" title="Parametrizada a partir de un ítem oficial: misma estructura, datos cambiados">VARIANTE · basada en examen real</span>`,
+  generada: `<span class="badge-generated" title="Escrita desde cero imitando el estilo del examen, no es del examen real">GENERADA · práctica</span>`,
+};
 
 export function renderQuestion(item, el, onListen) {
-  const badge = item.isReal ? REAL_BADGE
-    : (item.kind === "figure-series" || item.kind === "matrix") ? GENERATED_BADGE
-    : "";
+  const badge = BADGE_BY_ORIGEN[item.origen] ?? "";
+  if (item.kind === "listen") return renderListenQuestion(item, el, badge, onListen);
   if (item.kind === "figure-series") {
     el.innerHTML = `${badge}<p class="question">¿Qué figura continúa la serie?</p>
       <div class="figrow">${item.seq.map((f) => `<div class="fig">${fig(f)}</div>`).join("")}<div class="qmark" aria-label="incógnita">?</div></div>`;
@@ -104,15 +108,43 @@ export function renderQuestion(item, el, onListen) {
   } else if (item.kind === "figure-real") {
     el.innerHTML = `${badge}<p class="question">${item.prompt}</p>
       <div class="figreal"><img src="./public/assets/exams/${item.image}" alt="Figura del examen real" loading="lazy"></div>`;
-  } else if (item.kind === "listen") {
-    el.innerHTML = `${badge}<p class="question">${item.prompt}</p>
-      <button type="button" class="btn btn--blue" id="listen-btn"><span aria-hidden="true">🔊</span> Escuchar</button>
-      <p class="note" style="margin-top:8px">Puedes repetirlo las veces que quieras.</p>`;
-    el.querySelector("#listen-btn")?.addEventListener("click", () => onListen(item.audio));
   } else {
     el.innerHTML = `${badge}<p class="question">${item.prompt}</p>`;
   }
 }
+
+// Tarea 3: máximo 2 reproducciones por ítem, contando la reproducción automática al
+// mostrar la pregunta como la primera -- después de agotarlas, el botón se desactiva
+// (nunca "las veces que quieras": eso era lo que hacía trivial acertar sin escuchar).
+const MAX_LISTEN_PLAYS = 2;
+
+function renderListenQuestion(item, el, badge, onListen) {
+  const levelBadge = item.level ? `<span class="badge-generated" style="margin-left:6px">${LEVEL_LABEL[item.level] ?? `Nivel ${item.level}`}</span>` : "";
+  el.innerHTML = `${badge}${levelBadge}<p class="question">${item.prompt}</p>
+    <button type="button" class="btn btn--blue" id="listen-btn"><span aria-hidden="true">🔊</span> <span id="listen-btn-label">Escuchar</span></button>
+    <p class="note" id="listen-plays-note" style="margin-top:8px"></p>`;
+  const btn = el.querySelector("#listen-btn");
+  const note = el.querySelector("#listen-plays-note");
+  let plays = 0;
+  const paint = () => {
+    const left = MAX_LISTEN_PLAYS - plays;
+    note.textContent = left > 0
+      ? `Te quedan ${left} reproducción${left === 1 ? "" : "es"}.`
+      : `Sin reproducciones restantes: responde con lo que has escuchado.`;
+    btn.disabled = left <= 0;
+  };
+  const play = () => {
+    if (plays >= MAX_LISTEN_PLAYS) return;
+    plays++;
+    paint();
+    onListen(item);
+  };
+  btn.addEventListener("click", play);
+  paint();
+  play(); // la primera reproducción es automática al mostrar la pregunta
+}
+
+const LEVEL_LABEL = { A: "Nivel A · B1 bajo", B: "Nivel B · B1", C: "Nivel C · B2", D: "Nivel D · B2 alto" };
 
 /* ------------------------------- respuestas ------------------------------- */
 // Una opción del banco real puede ser un string (caso normal) o un objeto
@@ -244,15 +276,65 @@ export function lockWordbank(el) {
 }
 
 /* ------------------------------- audio ------------------------------- */
-export function speak(text) {
+// Tarea 3: velocidad natural por nivel (B1 140-160 ppm, B2 165-190 ppm) y acento
+// variado por turno. SpeechSynthesis no expone ni la velocidad real en palabras por
+// minuto ni garantiza qué voces trae cada navegador/SO -- `rate` es un multiplicador
+// relativo a la voz por defecto (1 = su ritmo normal), así que esto es el mejor
+// esfuerzo posible: se apunta al centro de cada rango asumiendo una voz "normal" de
+// referencia, no una cifra de ppm verificable en runtime.
+const RATE_BY_LEVEL = { A: 0.92, B: 0.98, C: 1.08, D: 1.15 };
+
+// Variantes de accent -> lang(es) de voz a probar en orden (con fallback a inglés
+// británico genérico si el navegador no trae esa variante instalada). "en-GB-SCT"
+// (escocés) casi nunca tiene voz propia en los motores TTS habituales: se queda con la
+// voz en-GB disponible -- el acento real depende del catálogo de voces del SO, esto es
+// lo máximo que Web Speech permite pedir.
+const ACCENT_LANGS = {
+  "en-GB": ["en-GB"], "en-US": ["en-US"], "en-IE": ["en-IE", "en-GB"],
+  "en-AU": ["en-AU", "en-GB"], "en-IN": ["en-IN", "en-GB"], "en-GB-SCT": ["en-GB"],
+};
+
+function pickVoice(accentId) {
+  const voices = window.speechSynthesis?.getVoices?.() ?? [];
+  for (const lang of (ACCENT_LANGS[accentId] ?? ["en-GB"])) {
+    const v = voices.find((x) => x.lang === lang);
+    if (v) return v;
+  }
+  return voices.find((x) => x.lang?.startsWith("en")) ?? null;
+}
+
+// Varias llamadas seguidas a speechSynthesis.speak() sin cancel() entre medias se
+// encolan y se reproducen en orden -- así se simulan varias voces/turnos con un único
+// motor TTS, sin necesitar encadenar promesas por onend.
+function queueTurn(text, accentId, rate) {
+  const u = new SpeechSynthesisUtterance(text);
+  const voice = pickVoice(accentId);
+  if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = (ACCENT_LANGS[accentId] ?? ["en-GB"])[0]; }
+  u.rate = rate;
+  window.speechSynthesis.speak(u);
+}
+
+/** Reproduce un ítem de listening completo (monólogo o diálogo multivoz). */
+export function speakItem(item) {
   try {
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "en-GB";
-    u.rate = 0.95;
-    window.speechSynthesis.speak(u);
+    const rate = RATE_BY_LEVEL[item.level] ?? 1;
+    if (Array.isArray(item.turns) && item.turns.length) {
+      for (const t of item.turns) queueTurn(t.text, t.accent, rate);
+    } else {
+      queueTurn(item.audio, item.accent ?? "en-GB", rate);
+    }
   } catch (e) { /* sin Web Speech el listening sigue siendo legible tras responder */ }
 }
+
+/** Transcripción para mostrar tras responder (nunca antes, ver renderListenQuestion). */
+export function transcriptText(item) {
+  if (Array.isArray(item.turns) && item.turns.length) {
+    return item.turns.map((t) => `<b>${t.speaker ?? "?"}:</b> ${t.text}`).join("<br>");
+  }
+  return item.audio;
+}
+
 export function stopSpeech() {
   try { window.speechSynthesis.cancel(); } catch (e) { /* no-op */ }
 }
