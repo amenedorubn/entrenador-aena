@@ -23,6 +23,19 @@ const diasSuf = (n) => `${Math.round(n)} días`;
 const plain = (n) => String(Math.round(n));
 const pct = (n) => `${Math.round(n)}%`;
 
+// Guardas de "carga aritmética" (revisión 2026-09-10): a mano, varias variantes salían
+// más pesadas que su semilla -- un operando con una cifra de más, o un resultado
+// intermedio no entero que format() redondeaba en silencio (p.ej. compute() da
+// 173,4... y se enseña "173", cuando la semilla daba un 180 limpio). digitsOf/
+// sameDigitRange fuerzan que cada parámetro generado tenga el mismo número de cifras
+// que el de la semilla; los genParams tocados abajo además construyen el resultado por
+// múltiplos exactos en vez de dejarlo a una división que puede no ser entera.
+function digitsOf(n) { return String(Math.round(Math.abs(n))).length; }
+function sameDigitRange(seedVal) {
+  const d = digitsOf(seedVal);
+  return [d === 1 ? 1 : 10 ** (d - 1), 10 ** d - 1];
+}
+
 /* --------------------- plantilla compartida: "vacío + % del total = lleno" --------------------- */
 // wa-aptitudes-37 (piscina) y wa-aptitudes-47 (contenedor) son la MISMA estructura
 // matemática: full = empty * 100 / (100 - P). La frase de apertura SÍ cambia entre
@@ -34,7 +47,16 @@ function emptyPercentSpec({ seedId, seedEmpty, seedP, opening, fluid, wholeNoun,
   return {
     seedId, family: "razonamiento_numerico_porcentajes",
     seedParams: { empty: seedEmpty, P: seedP },
-    genParams: () => ({ empty: randInt(20, 600), P: choice([90, 91, 92, 93, 94, 95, 96, 97, 98]) }),
+    // empty se construye como múltiplo exacto de (100-P): mismo nº de cifras que la
+    // semilla (sameDigitRange) y compute() sale entero siempre, no solo tras redondear.
+    genParams: () => {
+      const [lo, hi] = sameDigitRange(seedEmpty);
+      const P = choice([90, 91, 92, 93, 94, 95, 96, 97, 98]);
+      const g = 100 - P;
+      const kMin = Math.ceil(lo / g), kMax = Math.floor(hi / g);
+      const empty = g * randInt(kMin, kMax);
+      return { empty, P };
+    },
     compute: ({ empty, P }) => (empty * 100) / (100 - P),
     distractors: ({ empty, P }, correct) => [
       (empty * P) / (100 - P),               // invierte P/(100-P) en vez de 100/(100-P)
@@ -65,8 +87,14 @@ function chainedFractionSpec({ seedId, seedTotal, seedN1, seedD1, seedN2, seedD2
       const [n1, d1] = choice(fracPool);
       let [n2, d2] = choice(fracPool);
       while (d2 === d1 && n2 === n1) [n2, d2] = choice(fracPool);
-      const base = randInt(5, 60);
-      return { total: base * d1 * d2, n1, d1, n2, d2 };
+      // base se acota para que total = base×d1×d2 caiga en el mismo rango de cifras
+      // que la semilla (antes base iba de 5 a 60 fijo y con denominadores grandes total
+      // se iba a 4 cifras aunque la semilla tuviera 3).
+      const [lo, hi] = sameDigitRange(seedTotal);
+      const denom = d1 * d2;
+      const kMin = Math.max(1, Math.ceil(lo / denom)), kMax = Math.floor(hi / denom);
+      const base = randInt(kMin, Math.max(kMin, kMax));
+      return { total: base * denom, n1, d1, n2, d2 };
     },
     compute: ({ total, n1, d1, n2, d2 }) => (total * n1 * n2) / (d1 * d2),
     distractors: ({ total, n1, d1, n2, d2 }) => [
@@ -86,10 +114,13 @@ function inverseWorkSpec({ seedId, seedW1, seedD1, seedW2, workerNoun, taskNoun 
   return {
     seedId, family: "razonamiento_numerico_trabajo_velocidad",
     seedParams: { w1: seedW1, d1: seedD1, w2: seedW2 },
+    // d1 se construye como múltiplo exacto de w2 para que (d1×w1)/w2 salga entero
+    // siempre (antes salía fraccionario más de la mitad de las veces, p.ej. 39,375 días).
     genParams: () => {
-      const w1 = randInt(4, 30);
-      let w2 = randInt(1, w1 - 1);
-      return { w1, d1: randInt(2, 40), w2 };
+      const w2 = randInt(1, 9);
+      const d1 = w2 * randInt(1, 8);
+      const w1 = randInt(w2 + 1, Math.min(w2 + 20, 30));
+      return { w1, d1, w2 };
     },
     compute: ({ w1, d1, w2 }) => (d1 * w1) / w2,
     distractors: ({ w1, d1, w2 }) => [
@@ -127,8 +158,9 @@ export const NUMERIC_SPECS = [
     seedId: "wa-aptitudes-38", family: "razonamiento_numerico_edades",
     seedParams: { diff: 39, headStart: 21, futureBoss: 60 },
     genParams: () => {
-      const headStart = randInt(18, 35);
-      const futureBoss = 2 * headStart + randInt(5, 40);
+      const headStart = randInt(18, 29);
+      const extraMax = Math.min(40, 99 - 2 * headStart); // futureBoss se queda en 2 cifras, como la semilla (60)
+      const futureBoss = 2 * headStart + randInt(5, extraMax);
       return { diff: futureBoss - headStart, headStart, futureBoss };
     },
     compute: ({ diff }) => diff,
@@ -159,8 +191,9 @@ export const NUMERIC_SPECS = [
     seedId: "wa-aptitudes-40", family: "razonamiento_numerico_aritmetica_general",
     seedParams: { total: 900, back: 150 },
     genParams: () => {
-      const total = randInt(4, 16) * 100;
-      const back = randInt(1, Math.floor(total / 8)) * 10;
+      const total = randInt(4, 9) * 100; // 3 cifras, como la semilla (900)
+      const half = total / 2;
+      const back = randInt(1, Math.floor(half / 10)) * 10; // nunca más de la mitad del viaje (antes podía superarla)
       return { total, back };
     },
     compute: ({ total, back }) => total + 2 * back,
@@ -186,7 +219,7 @@ export const NUMERIC_SPECS = [
   {
     seedId: "wa-aptitudes-43", family: "razonamiento_numerico_algebraico",
     seedParams: { A: 25, C: 26 },
-    genParams: () => { const A = randInt(-20, 40), Bwanted = randInt(-20, 20); return { A, C: 2 * A + 2 * Bwanted }; },
+    genParams: () => { const A = randInt(-20, 20), Bwanted = randInt(-20, 20); return { A, C: 2 * A + 2 * Bwanted }; },
     compute: ({ A, C }) => (C - 2 * A) / 2,
     distractors: ({ A, C }, correct) => [C - 2 * A, -correct, (C + 2 * A) / 2],
     format: plain,
@@ -206,7 +239,7 @@ export const NUMERIC_SPECS = [
   {
     seedId: "ex20240317-47", family: "razonamiento_numerico_algebraico",
     seedParams: { A: 5, offset: 6, B: -2 },
-    genParams: () => ({ A: randInt(-20, 30), offset: randInt(2, 15), B: randInt(-15, 15) }),
+    genParams: () => ({ A: randInt(-9, 9), offset: randInt(2, 9), B: randInt(-9, 9) }), // 1 cifra, como la semilla (A=5, offset=6, B=-2)
     compute: ({ A, offset }) => A + offset,
     distractors: ({ A, offset, B }) => [A + offset + B, A - offset, offset],
     format: plain,
@@ -217,9 +250,11 @@ export const NUMERIC_SPECS = [
   {
     seedId: "wa-aptitudes-44", family: "razonamiento_numerico_probabilidad",
     seedParams: { faces: 6, minCond: 3 },
+    // Sin los dados de 10 caras: la semilla usa un dado de 6 caras (1 cifra) y un dado
+    // de 10 le añade una cifra de más a "faces" y "minCond" sin aportar nada al cálculo.
     genParams: () => choice([
       { faces: 6, minCond: 3 }, { faces: 6, minCond: 2 }, { faces: 6, minCond: 5 },
-      { faces: 10, minCond: 6 }, { faces: 10, minCond: 1 }, { faces: 4, minCond: 3 }, { faces: 8, minCond: 5 },
+      { faces: 4, minCond: 3 }, { faces: 8, minCond: 5 },
     ]),
     compute: ({ faces, minCond }) => Math.round(100 / (faces - minCond + 1)),
     distractors: ({ faces, minCond }) => {
@@ -235,7 +270,9 @@ export const NUMERIC_SPECS = [
     seedId: "wa-aptitudes-46", family: "razonamiento_numerico_aritmetica_general",
     seedParams: { S: 90, m: 2, o: 10 },
     genParams: () => {
-      const first = randInt(5, 40), m = choice([2, 3, 4]), o = randInt(5, 30);
+      // first tope en 11: con m=4 (peor caso, ×6) y o=30, S = 11×6+30 = 96, 2 cifras
+      // como la semilla (90). Con el tope viejo (40) S podía llegar a 270.
+      const first = randInt(5, 11), m = choice([2, 3, 4]), o = randInt(5, 30);
       return { S: first * (2 + m) + o, m, o };
     },
     compute: ({ S, m, o }) => (S - o) / (2 + m) + o,
@@ -255,7 +292,17 @@ export const NUMERIC_SPECS = [
   {
     seedId: "wa-aptitudes-48", family: "razonamiento_numerico_porcentajes",
     seedParams: { price: 1.5, count: 300, P: 10 },
-    genParams: () => ({ price: choice([1, 1.5, 2, 2.5, 3]), count: randInt(100, 500), P: choice([5, 10, 15, 20, 25]) }),
+    // count se construye como múltiplo exacto de 200/gcd(price×2×P, 200) para que
+    // price×count×P/100 salga entero siempre (antes, p.ej. 1€×145×25% = 36,25€).
+    genParams: () => {
+      const price = choice([1, 1.5, 2, 2.5, 3]);
+      const P = choice([5, 10, 15, 20, 25]);
+      const g = gcd(price * 2 * P, 200);
+      const step = 200 / g;
+      const kMin = Math.ceil(100 / step), kMax = Math.floor(500 / step);
+      const count = step * randInt(kMin, kMax);
+      return { price, count, P };
+    },
     compute: ({ price, count, P }) => (price * count * P) / 100,
     distractors: ({ price, count, P }) => [price * count, (price * count * (100 - P)) / 100, (count * P) / 100],
     format: euros,
@@ -302,7 +349,12 @@ export const NUMERIC_SPECS = [
   {
     seedId: "wa-aptitudes-54", family: "razonamiento_numerico_edades",
     seedParams: { diff: 3, m: 2, F: 5 },
-    genParams: () => { const m = choice([2, 3]), E = randInt(2, 20); return { diff: (m - 1) * E, m, F: randInt(2, 10), E }; },
+    genParams: () => {
+      const m = choice([2, 3]);
+      const E = randInt(2, m === 2 ? 9 : 4); // (m-1)×E se queda en 1 cifra, como diff=3 en la semilla
+      const F = randInt(2, 9);
+      return { diff: (m - 1) * E, m, F, E };
+    },
     compute: ({ diff, m }) => (m * diff) / (m - 1),
     distractors: ({ diff, m, F, E }) => [diff * m, diff + F, E ?? diff / (m - 1)],
     format: plain,
@@ -317,7 +369,7 @@ export const NUMERIC_SPECS = [
   {
     seedId: "ex20240317-37", family: "razonamiento_numerico_trabajo_velocidad",
     seedParams: { perTruck: 62, trucks: 3 },
-    genParams: () => ({ perTruck: randInt(15, 150), trucks: randInt(2, 8) }),
+    genParams: () => ({ perTruck: randInt(15, 99), trucks: randInt(2, 8) }), // 2 cifras, como la semilla (62)
     compute: ({ perTruck, trucks }) => perTruck * trucks,
     distractors: ({ perTruck, trucks }) => [perTruck * (trucks - 1), perTruck + trucks, perTruck * trucks + trucks],
     format: plain,
@@ -337,7 +389,14 @@ export const NUMERIC_SPECS = [
   {
     seedId: "ex20240317-39", family: "razonamiento_numerico_trabajo_velocidad",
     seedParams: { headStartHours: 4, horseSpeed: 20, catchUpHours: 2 },
-    genParams: () => ({ headStartHours: randInt(1, 6), horseSpeed: randInt(10, 40), catchUpHours: randInt(1, 6) }),
+    // horseSpeed se construye como múltiplo exacto de catchUpHours para que el reparto
+    // salga entero siempre (antes, p.ej. 18,33 Km/h).
+    genParams: () => {
+      const catchUpHours = randInt(1, 6);
+      const horseSpeed = catchUpHours * randInt(2, 9);
+      const headStartHours = randInt(1, 6);
+      return { headStartHours, horseSpeed, catchUpHours };
+    },
     compute: ({ headStartHours, horseSpeed, catchUpHours }) => (horseSpeed * (headStartHours + catchUpHours)) / catchUpHours,
     distractors: ({ headStartHours, horseSpeed, catchUpHours }) => [
       horseSpeed,
@@ -373,7 +432,10 @@ export const NUMERIC_SPECS = [
       const ratioA = randInt(2, 6);
       let ratioB = randInt(2, 7);
       while (ratioB === ratioA) ratioB = randInt(2, 7);
-      return { ratioA, ratioB, countB: ratioB * randInt(3, 20) };
+      // tope de countB en 2 cifras, como la semilla (32) -- antes randInt(3,20) fijo
+      // podía dar countB=140 con ratioB=7.
+      const kMax = Math.max(3, Math.floor(99 / ratioB));
+      return { ratioA, ratioB, countB: ratioB * randInt(3, kMax) };
     },
     compute: ({ ratioA, ratioB, countB }) => (countB * ratioA) / ratioB + countB,
     distractors: ({ ratioA, ratioB, countB }) => [(countB * ratioA) / ratioB, countB, countB + ratioA],
@@ -407,7 +469,17 @@ export const NUMERIC_SPECS = [
   {
     seedId: "ex20240317-51", family: "razonamiento_numerico_porcentajes",
     seedParams: { price: 90, P: 30 },
-    genParams: () => ({ price: randInt(20, 500), P: choice([10, 15, 20, 25, 30, 40, 50]) }),
+    // price se construye como múltiplo exacto de 100/gcd(P,100) para que el descuento
+    // salga entero siempre (antes, p.ej. 356€ al 10% = 35,6€), y se queda en 2 cifras
+    // como la semilla (90).
+    genParams: () => {
+      const P = choice([10, 15, 20, 25, 30, 40, 50]);
+      const g = gcd(P, 100);
+      const step = 100 / g;
+      const kMin = Math.ceil(10 / step), kMax = Math.floor(99 / step);
+      const price = step * randInt(kMin, Math.max(kMin, kMax));
+      return { price, P };
+    },
     compute: ({ price, P }) => (price * P) / 100,
     distractors: ({ price, P }) => [price * (1 - P / 100), price - P, (price * 100) / (100 - P)],
     format: eurosPalabra,
