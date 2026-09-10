@@ -1,6 +1,6 @@
 # Auditoría de preguntas reales (data/real.source.js)
 
-Generado por `scripts/validate-questions.mjs`. Total de ítems: 710. Ítems con hallazgos que ameritan `status: "revision"`: 0 (0 ya marcados y excluidos del pool por content.js, 0 pendientes de marcar).
+Generado por `scripts/validate-questions.mjs`. Total de ítems: 717. Ítems con hallazgos que ameritan `status: "revision"`: 0 (0 ya marcados y excluidos del pool por content.js, 0 pendientes de marcar).
 
 _(f) y (g) parten de 123 assets encontrados en public/assets/exams/._
 
@@ -75,15 +75,15 @@ Ninguno. (Nota: una comprobación ingenua solo por texto de prompt da 60 falsos 
 
 | categoría | total | en revisión |
 |---|---|---|
-| analogias | 125 | 0 |
+| analogias | 126 | 0 |
 | domino | 19 | 0 |
 | figuras_no_relacionadas | 50 | 3 |
 | ingles_b1 | 50 | 0 |
-| ingles_b2 | 45 | 0 |
+| ingles_b2 | 50 | 0 |
 | matrices | 73 | 0 |
 | razonamiento_numerico | 40 | 0 |
 | relojes | 40 | 0 |
 | secuencia_num_letras | 39 | 0 |
 | series_figuras | 77 | 5 |
 | series_numeros | 60 | 0 |
-| sinonimos_antonimos | 92 | 0 |
+| sinonimos_antonimos | 93 | 1 |

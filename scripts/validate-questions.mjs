@@ -24,6 +24,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { checkEncFreshness } from "./lib/check-enc-freshness.mjs";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_PATH = path.join(ROOT, "data", "real.source.js");
@@ -36,6 +37,15 @@ if (!existsSync(SOURCE_PATH)) {
     "Nada que validar: pide el fichero por el canal habitual antes de correr esto."
   );
   process.exit(0);
+}
+
+{
+  const RED = "\x1b[31m", RESET = "\x1b[0m";
+  const freshness = checkEncFreshness();
+  if (freshness.stale) {
+    console.error(`${RED}real.enc.json está desactualizado, hay que re-cifrar.${RESET}`);
+    console.error(`${RED}${freshness.message}${RESET}`);
+  }
 }
 
 const { REAL, FIGURE_CATEGORIES, CATEGORY_SOURCE } = await import(pathToFileURL(SOURCE_PATH));
