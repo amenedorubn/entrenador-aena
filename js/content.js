@@ -43,19 +43,44 @@ function itemSignature(item) {
   return `${item.family}|${item.tier}|${JSON.stringify(item.seq ?? item.cells ?? item.options)}`;
 }
 
+// Cuota dura (Fase E del motor de variantes): como mucho el 60% de una lección puede
+// ser origen:"variante" -- para que no ahoguen a las oficiales. Se mide sobre el
+// subconjunto REAL servido (oficial+variante), no sobre el total de la lección: si se
+// midiera contra el total, las preguntas "generada" diluirían la proporción y dejarían
+// colarse una mayoría de variantes DENTRO del propio bloque real sin que la cuota
+// se enterase (justo el caso -- variantes ahogando a las oficiales -- que la cuota
+// existe para evitar). Se aplica de forma "greedy" sobre la cuenta ya servida en ESTA
+// lección (dedupe.counts), no es una proporción exacta garantizada al final (una
+// lección corta puede desviarse un poco), pero nunca deja que la cuenta acumulada
+// supere el límite en ningún punto.
+const VARIANT_QUOTA = 0.6;
+
 /** Estado de deduplicación de una lección/práctica: qué ids reales y qué firmas ya se han servido. */
 function newDedupeSession() {
-  return { usedIds: new Set(), usedSignatures: new Set(), realQueues: {} };
+  return {
+    usedIds: new Set(), usedSignatures: new Set(), realQueues: {},
+    // familyId: el propio id para un ítem oficial, o el origenId (la semilla) para una
+    // variante -- así una variante nunca coincide en la misma lección con su semilla ni
+    // con otra variante hermana (misma pregunta de fondo, distinto distractor).
+    usedFamilyIds: new Set(),
+    // `real` cuenta solo oficial+variante servidos (para la cuota); `variant` es el
+    // subconjunto de esos que son origen:"variante".
+    counts: { real: 0, variant: 0 },
+  };
 }
 
 /**
  * Cola barajada (Fisher-Yates, vía shuffle()) de las preguntas reales elegibles para
  * una fuente+nivel, sin reemplazo: se construye UNA VEZ por lección y se consume en
  * orden, nunca se vuelve a barajar ni se repite un id ya servido. Prioriza el pool de
- * nivel cercano (±1) y solo baja al resto del pool si ese se agota.
+ * nivel cercano (±1) y solo baja al resto del pool si ese se agota. `origenFilter`
+ * ("oficial"|"variante"|"todas") restringe de qué origen sale el pool -- "generada"
+ * nunca llega aquí (ver makeItem, ese caso ni intenta pickReal).
  */
-function buildRealQueue(cats, tier) {
-  const pool = REAL.filter((r) => cats.includes(r.category) && r.status !== "revision");
+function buildRealQueue(cats, tier, origenFilter) {
+  const pool = REAL.filter((r) =>
+    cats.includes(r.category) && r.status !== "revision" &&
+    (origenFilter === "todas" || origenFilter === undefined || r.origen === origenFilter));
   const near = pool.filter((r) => Math.abs(r.lvl - tier) <= 1);
   const rest = pool.filter((r) => Math.abs(r.lvl - tier) > 1);
   return [...shuffle(near), ...shuffle(rest)];
@@ -67,6 +92,10 @@ function buildRealQueue(cats, tier) {
  * Consume sin reemplazo de la cola barajada de esta sesión: nunca repite un id real
  * ya servido en la misma lección. Devuelve null si no hay banco real para esa fuente,
  * si toca generar, o si la cola de esta fuente ya se agotó en esta lección.
+ * Con origenFilter "oficial"/"variante" (real es la ÚNICA fuente posible, makeItem no
+ * genera de relleno en esos modos) el sorteo de REAL_CHANCE no aplica -- se intenta
+ * siempre, o cada hueco de la lección tendría solo un 35% de probabilidad de rellenarse
+ * y la lección saldría casi vacía sin motivo.
  */
 // Una pregunta es "figura" si su categoría lo es por defecto (matrices, dominó...) o si
 // trae imagen propia aunque su categoría no esté en FIGURE_CATEGORIES (p. ej. las
@@ -103,20 +132,31 @@ function toRealItem(q, source, tier) {
   };
 }
 
-function pickReal(source, tier, dedupe) {
+function pickReal(source, tier, dedupe, origenFilter) {
   const cats = SOURCE_CATEGORIES[source];
   if (!cats || !cats.length) return null;
-  if (Math.random() >= REAL_CHANCE) return null;
+  const forcedReal = origenFilter === "oficial" || origenFilter === "variante";
+  if (!forcedReal && Math.random() >= REAL_CHANCE) return null;
 
-  const queue = (dedupe.realQueues[source] ??= buildRealQueue(cats, tier));
+  const queue = (dedupe.realQueues[source] ??= buildRealQueue(cats, tier, origenFilter));
   while (queue.length) {
     const candidate = queue.shift();
     if (dedupe.usedIds.has(candidate.id)) continue;
+    const family = candidate.origen === "variante" ? candidate.origenId : candidate.id;
+    if (dedupe.usedFamilyIds.has(family)) continue; // la semilla (o una hermana) ya salió en esta lección
+    // La cuota del 60% solo tiene sentido en modo mixto ("todas"): si el filtro ya es
+    // "variante" a propósito (el usuario pidió solo variantes), no hay nada que limitar.
+    if (candidate.origen === "variante" && !forcedReal) {
+      const wouldBe = (dedupe.counts.variant + 1) / (dedupe.counts.real + 1);
+      if (wouldBe > VARIANT_QUOTA) continue; // cuota del 60% del bloque real ya cubierta: se prueba la siguiente de la cola
+    }
     dedupe.usedIds.add(candidate.id);
     const real = toRealItem(candidate, source, tier);
-    if (real) return real; // si falla la integridad, toRealItem ya lo registró: se prueba el siguiente de la cola
+    if (!real) continue; // si falla la integridad, toRealItem ya lo registró: se prueba el siguiente de la cola
+    dedupe.usedFamilyIds.add(family);
+    return real;
   }
-  return null; // pool agotado (o sin ítems íntegros) para esta fuente en esta lección -> toca generar
+  return null; // pool agotado (o sin ítems íntegros/dentro de cuota) para esta fuente en esta lección -> toca generar
 }
 
 /**
@@ -196,19 +236,22 @@ function generateUnique(fn, tier, dedupe, opts) {
  * repitiendo. `opts` se pasa tal cual al generador (p. ej. { level: "C" } para forzar
  * un nivel de listening concreto desde el selector de Práctica libre, ver app.js) --
  * los generadores que no lo usan simplemente lo ignoran. `opts.origenFilter`
- * ("oficial"|"generada"|"todas", Tarea 1) filtra qué puede servirse: "oficial" nunca
- * genera (si el pool real está vacío o agotado, la pregunta se descarta, nunca se
- * rellena con una generada), "generada" nunca sirve REAL. Sin origenFilter (o "todas")
- * se comporta como siempre.
+ * ("oficial"|"variante"|"generada"|"todas", Tarea 1 + Fase E) filtra qué puede
+ * servirse: "oficial"/"variante" solo sirven REAL de ese origen concreto y nunca
+ * generan si el pool está vacío/agotado/fuera de cuota (la pregunta se descarta, nunca
+ * se rellena con una generada); "generada" nunca sirve REAL. Sin origenFilter (o
+ * "todas") se comporta como siempre: cualquier origen vale.
  */
 export function makeItem(source, tier, dedupe = newDedupeSession(), opts = {}) {
   const filter = opts.origenFilter ?? "todas";
-  const real = filter !== "generada" ? pickReal(source, tier, dedupe) : null;
+  const real = filter !== "generada" ? pickReal(source, tier, dedupe, filter) : null;
   if (real) {
     dedupe.usedSignatures.add(itemSignature(real));
+    dedupe.counts.real++;
+    if (real.origen === "variante") dedupe.counts.variant++;
     return { ...real, source };
   }
-  if (filter === "oficial") return null;
+  if (filter === "oficial" || filter === "variante") return null;
   const fn = SOURCES[source];
   if (!fn) throw new Error(`Fuente desconocida: ${source}`);
   const generated = generateUnique(fn, tier, dedupe, opts);

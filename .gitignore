@@ -13,3 +13,17 @@ data/raw_extracted/
 # data/real.enc.json (cifrado con AES-GCM, ver scripts/encrypt.mjs).
 data/real.source.js
 data/real.plain.json
+# Variantes (motor de la Fase B/E): derivan de real.source.js y citan su enunciado
+# literal -- mismo motivo, mismo tratamiento. Se cifran junto con REAL (ver Fase E).
+data/variantes.source.js
+
+# Informes que citan texto literal de preguntas reales como ejemplo (inventario de
+# semillas, muestras de variantes lado a lado...): mismo motivo que real.source.js, no
+# deben llegar a un repo público. Los que NO citan texto (questions-audit.md) sí se suben.
+reports/SEMILLAS.md
+reports/MUESTRA_VARIANTES.md
+
+# Staging de variantes generadas (Fase B/C/D del motor de variantes): deriva de
+# real.source.js, contiene enunciados reales -- no es el banco final (eso es
+# data/variantes.source.js, Fase E, tras aprobar la muestra) y no debe llegar al repo.
+data/variantes.staging.json
