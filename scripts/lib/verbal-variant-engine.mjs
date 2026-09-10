@@ -42,6 +42,15 @@ const DIFFICULTY_LVL = { facil: 1.5, media: 2.5, dificil: 4 };
 // vocabulario común (mismo registro que data/lexicon.js, ni nombre propio ni símbolo ni
 // número): el resto se descarta explícitamente, no por una heurística automática en la
 // que no confío al 100%, sino por id -- así queda auditable qué se incluyó y por qué.
+// Exclusión a mano (Fase D, revisión humana de la muestra): el distractor "Sobrio"
+// generado para wa-aptitudes-12 (antónimo de "Lisonjero") es defendible casi tanto como
+// la correcta "Molesto" -- "lisonjero" es polisémico en español (adulador / grato-agradable)
+// y esa segunda acepción hace que "sobrio" (comedido, sin adornos) compita de verdad. La
+// regla de polisemia de más abajo NO habría cazado este caso (data/lexicon.js solo tiene
+// UNA entrada para "lisonjero": {sense:"real-lisonjero"}, añadida específicamente para
+// esta semilla) -- por eso hace falta esta exclusión explícita además de la regla general.
+const EXCLUDED_SEED_IDS = new Set(["wa-aptitudes-12"]);
+
 const ELIGIBLE_ANALOGY_IDS = new Set([
   "wa-aptitudes-8",   // Apaciguar:Tranquilizar :: Rechazar:Repeler
   "wa-aptitudes-11",  // Acopio:Provisión :: Estridente:Llamativo
@@ -63,6 +72,37 @@ const PROMPT_WORD_STOPLIST = new Set([
 function promptOwnWords(prompt) {
   const words = prompt.match(/\b\p{Lu}[\p{Ll}]+\b/gu) ?? [];
   return words.filter((w) => !PROMPT_WORD_STOPLIST.has(w));
+}
+
+// Palabra preguntada exacta (el primer término con mayúscula del prompt, tras el
+// stoplist) -- para la regla de polisemia hace falta la palabra EN SÍ, no toda la lista
+// de "palabras propias" (que en analogías incluye 2-3 términos).
+function targetWord(prompt) {
+  return promptOwnWords(prompt)[0] ?? "";
+}
+
+/**
+ * Regla anti-ambigüedad pedida explícitamente tras la Fase D: si la palabra preguntada
+ * tiene MÁS DE UN sentido registrado en data/lexicon.js (aparece como w/s/a de entradas
+ * con `sense` distinto -- p. ej. "audaz" es sinónimo de "valiente" en una entrada Y
+ * antónimo de "cobarde" en otra), un distractor sacado del léxico sin más cuidado podría
+ * colisionar con esa otra acepción. Se descarta la semilla en vez de intentar generar
+ * distractores "de un solo sentido" (exigiría saber CUÁL de los sentidos es el que
+ * pregunta la semilla, y el léxico no lo dice). OJO: esto NO sustituye la revisión
+ * humana -- no detecta polisemia del mundo real que el léxico no haya registrado (ver
+ * EXCLUDED_SEED_IDS: "lisonjero" solo tiene una entrada en el léxico y aun así generó un
+ * distractor problemático).
+ */
+function wordSenseCount(word) {
+  const target = normWord(word);
+  const senses = new Set();
+  for (const e of SYNONYMS) {
+    if (normWord(e.w) === target || normWord(e.s) === target) senses.add(`syn:${e.sense}`);
+  }
+  for (const e of ANTONYMS) {
+    if (normWord(e.w) === target || normWord(e.a) === target) senses.add(`ant:${e.sense}`);
+  }
+  return senses.size;
 }
 
 /**
@@ -99,8 +139,10 @@ function pickDistractors(pool, excludeWords, wantLvl, n, avoidCombos) {
  * cuando el léxico no dio para construir ni una sola terna limpia.
  */
 export function generateVerbalVariants(seed, count) {
+  if (EXCLUDED_SEED_IDS.has(seed.id)) return { variants: [], discarded: true, reason: "excluida a mano tras revisión humana (Fase D)" };
   const isAnalogy = seed.category === "analogias";
   if (isAnalogy && !ELIGIBLE_ANALOGY_IDS.has(seed.id)) return { variants: [], discarded: true, reason: "analogía de cultura general o formato de dos huecos, no de relación léxica" };
+  if (wordSenseCount(targetWord(seed.prompt)) > 1) return { variants: [], discarded: true, reason: "palabra objetivo polisémica en data/lexicon.js" };
   // Las analogías léxicas elegibles comparten registro con sinónimos/antónimos (relación
   // de grado/antonimia entre vocabulario común) -- ANALOGY_RELATIONS son sustantivos
   // concretos de relaciones especialista-órgano/ciencia-objeto, mal encaje de registro

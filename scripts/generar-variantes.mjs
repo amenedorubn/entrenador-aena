@@ -30,41 +30,43 @@ const { REAL } = await import(pathToFileURL(SOURCE_PATH));
 const byId = new Map(REAL.map((r) => [r.id, r]));
 
 const out = [];
-const summary = { numeric: {}, verbal: {}, discardedVerbal: { sinonimos_antonimos: 0, analogias: 0, analogiasNoElegibles: 0 } };
+const numericCounts = {};
+const verbalCounts = {};
+const discardReasons = new Map(); // motivo -> nº de semillas
+const bump = (reason) => discardReasons.set(reason, (discardReasons.get(reason) ?? 0) + 1);
 
 /* ------------------------------- numérico (29 semillas, "sí") ------------------------------- */
+// status:"revision" (semilla marcada como dudosa tras auditoría manual, ver
+// notaRevision) nunca genera variante -- si la clave real está en duda, cualquier
+// variante heredaría la misma duda.
 for (const spec of NUMERIC_SPECS) {
   const seed = byId.get(spec.seedId);
   if (!seed) { console.warn(`[aviso] semilla "${spec.seedId}" no encontrada en REAL, se omite.`); continue; }
+  if (seed.status === "revision") { bump("semilla en status:revision"); continue; }
   const variants = runNumericSpec(spec, seed, NUMERIC_PER_SEED); // lanza si el autocheck falla
   out.push(...variants);
-  summary.numeric[spec.seedId] = variants.length;
+  numericCounts[spec.seedId] = variants.length;
 }
 
 /* -------------------------- verbal (sinónimos/antónimos + analogías elegibles) -------------------------- */
-const verbalSeeds = REAL.filter((it) => it.category === "sinonimos_antonimos" || it.category === "analogias");
+const verbalSeeds = REAL.filter((it) => (it.category === "sinonimos_antonimos" || it.category === "analogias") && it.status !== "revision");
+let sinAntSeeds = 0, sinAntGenerated = 0, analogiaSeeds = 0, analogiaGenerated = 0;
 for (const seed of verbalSeeds) {
+  if (seed.category === "sinonimos_antonimos") sinAntSeeds++; else analogiaSeeds++;
   const { variants, discarded, reason } = generateVerbalVariants(seed, VERBAL_PER_SEED);
-  if (discarded) {
-    if (seed.category === "analogias") {
-      summary.discardedVerbal.analogias++;
-      if (reason) summary.discardedVerbal.analogiasNoElegibles++;
-    } else {
-      summary.discardedVerbal.sinonimos_antonimos++;
-    }
-    continue;
-  }
+  if (discarded) { bump(reason ?? "léxico insuficiente para 3 distractores limpios"); continue; }
   out.push(...variants);
-  summary.verbal[seed.id] = variants.length;
+  verbalCounts[seed.id] = variants.length;
+  if (seed.category === "sinonimos_antonimos") sinAntGenerated++; else analogiaGenerated++;
 }
 
 writeFileSync(STAGING_PATH, JSON.stringify(out, null, 2), "utf8");
 
-const numericTotal = Object.values(summary.numeric).reduce((a, b) => a + b, 0);
-const verbalTotal = Object.values(summary.verbal).reduce((a, b) => a + b, 0);
-console.log(`Numérico: ${NUMERIC_SPECS.length} semillas -> ${numericTotal} variantes (objetivo ${NUMERIC_SPECS.length * NUMERIC_PER_SEED}).`);
-console.log(`Verbal: ${verbalSeeds.length} semillas evaluadas -> ${verbalTotal} variantes.`);
-console.log(`  sinónimos/antónimos: ${92 - summary.discardedVerbal.sinonimos_antonimos}/92 generaron, ${summary.discardedVerbal.sinonimos_antonimos} descartadas por léxico insuficiente.`);
-console.log(`  analogías: ${summary.discardedVerbal.analogias === 0 ? 0 : Object.keys(summary.verbal).length - (92 - summary.discardedVerbal.sinonimos_antonimos)} generaron, ${summary.discardedVerbal.analogiasNoElegibles} descartadas por no ser relación léxica pura (cultura general / formato de dos huecos), ${summary.discardedVerbal.analogias - summary.discardedVerbal.analogiasNoElegibles} descartadas por léxico insuficiente.`);
+const numericTotal = Object.values(numericCounts).reduce((a, b) => a + b, 0);
+const verbalTotal = Object.values(verbalCounts).reduce((a, b) => a + b, 0);
+console.log(`Numérico: ${Object.keys(numericCounts).length} semillas generaron -> ${numericTotal} variantes.`);
+console.log(`Verbal: sinónimos/antónimos ${sinAntGenerated}/${sinAntSeeds} generaron, analogías ${analogiaGenerated}/${analogiaSeeds} generaron -> ${verbalTotal} variantes.`);
+console.log(`\nDescartes por motivo:`);
+for (const [reason, n] of [...discardReasons.entries()].sort((a, b) => b[1] - a[1])) console.log(`  ${n}: ${reason}`);
 console.log(`\nTotal variantes generadas: ${out.length}`);
 console.log(`Staging: ${path.relative(ROOT, STAGING_PATH)} (gitignored)`);

@@ -61,11 +61,12 @@
     <div class="card">
       <div class="card__title">Origen de las preguntas</div>
       <div class="segmented" id="practice-origen-filter" role="group" aria-label="Filtro de origen">
-        <button type="button" data-origen="oficial" aria-pressed="false">Solo oficiales</button>
+        <button type="button" data-origen="oficial" aria-pressed="false">Oficiales</button>
+        <button type="button" data-origen="variante" aria-pressed="false">Variantes</button>
+        <button type="button" data-origen="generada" aria-pressed="false">Generadas</button>
         <button type="button" data-origen="todas" aria-pressed="true">Todas</button>
-        <button type="button" data-origen="generada" aria-pressed="false">Solo generadas</button>
       </div>
-      <p class="note" style="margin-top:10px">Afecta también al camino y a Repasar fallos. "Solo oficiales" puede dar lecciones más cortas si no hay suficiente banco real para ese bloque.</p>
+      <p class="note" style="margin-top:10px">Afecta también al camino y a Repasar fallos. "Oficiales" o "Variantes" puede dar lecciones más cortas si no hay suficiente banco de ese origen para ese bloque. En "Todas", como mucho el 60% de una lección son variantes.</p>
     </div>
 
     <div class="card">
@@ -197,8 +198,9 @@
         <div><div class="row__label">Origen de las preguntas</div><div class="row__hint">Mismo filtro que en Práctica libre</div></div>
         <div class="segmented" id="settings-origen-filter" role="group" aria-label="Filtro de origen">
           <button type="button" data-origen="oficial" aria-pressed="false">Oficiales</button>
-          <button type="button" data-origen="todas" aria-pressed="true">Todas</button>
+          <button type="button" data-origen="variante" aria-pressed="false">Variantes</button>
           <button type="button" data-origen="generada" aria-pressed="false">Generadas</button>
+          <button type="button" data-origen="todas" aria-pressed="true">Todas</button>
         </div>
       </div>
     </div>
