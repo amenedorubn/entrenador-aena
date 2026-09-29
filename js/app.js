@@ -108,17 +108,20 @@ const PLAN_START_MS = new Date(2026, 8, 29, 12, 12).getTime();
 const PLAN_BASE_DONE = LESSONS.findIndex((l) => l.unitId === "w2u2");
 
 const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-// Huecos reales de la semana del examen (calendario del usuario + fin de trabajo a las
-// 15:00 ambos días): entre el trabajo/comida y la cena o la salida del viernes.
-// [inicio, fin] en horas locales decimales. Fuera de estos días, 09:00-22:00.
+// Compromiso del usuario para la semana del examen: estudia en cualquier hueco (también
+// en horas de trabajo, comidas y desplazamientos). Ventana [inicio, fin] en horas locales
+// decimales (despierto y sin correr/dormir) y horas de estudio efectivas dentro de ella.
+// Suman 26,5 h: lo que hace falta a ~45 s por pregunta para camino + reales (~25 h).
+// El viernes acaba a las 20:00 (cena fuera 20:30) -> el 100 % queda antes de dormir.
 const STUDY_WINDOWS = {
-  "2026-09-29": [15.5, 21],   // mar: teletrabajo, cena 21:00
-  "2026-09-30": [15.5, 20.5], // mié: teletrabajo, cena adelantada 20:30
-  "2026-10-01": [16, 21],     // jue: oficina (vuelta ~16:00), cena 21:00
-  "2026-10-02": [16, 20],     // vie: oficina, cena fuera 20:30 -> 100 % antes de dormir
+  "2026-09-29": [12.2, 21.5], // mar: desde ahora hasta la cena
+  "2026-09-30": [8, 20.5],    // mié: tras el rodaje y el desayuno, hasta la cena adelantada
+  "2026-10-01": [8, 21],      // jue: oficina + tarde
+  "2026-10-02": [8, 20],      // vie: oficina + tarde, hasta salir a cenar
 };
+const STUDY_HOURS = { "2026-09-29": 6, "2026-09-30": 7, "2026-10-01": 7, "2026-10-02": 6.5 };
 const windowForDay = (d) => STUDY_WINDOWS[dayKey(d)] ?? [9, 22];
-const defaultHoursForDay = (d) => { const w = STUDY_WINDOWS[dayKey(d)]; return w ? w[1] - w[0] : store.studyHours; };
+const defaultHoursForDay = (d) => STUDY_HOURS[dayKey(d)] ?? store.studyHours;
 const hoursForDay = (d) => { const o = store.studyDays[dayKey(d)]; return Number.isFinite(o) ? o : defaultHoursForDay(d); };
 
 function currentPlan(progress) {
