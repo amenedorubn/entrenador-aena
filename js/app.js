@@ -2,7 +2,7 @@ import {
   WORLDS, LESSONS, PASS_THRESHOLD, QUESTIONS_PER_LESSON, HEARTS,
   isPassed, lessonState, currentLessonIndex, unitProgress, worldProgress, worldUnlocked, totalPassed,
 } from "./curriculum.js";
-import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES } from "./content.js";
+import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES, setSeenIds, realCoverage, buildUnseenLesson } from "./content.js";
 import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speakItem, stopSpeech, optionText, transcriptText } from "./engine.js";
 import { LEVELS as LISTEN_LEVELS, LEVEL_LABEL as LISTEN_LEVEL_LABEL } from "../data/listening.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
@@ -10,7 +10,7 @@ import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/compete
 import { loadReal, REAL } from "../data/real.js";
 import { choice, shuffle } from "./rng.js";
 import { APP_VERSION } from "./version.js";
-import { computePlan } from "./plan.js";
+import { computePlan, feasibility } from "./plan.js";
 
 /* ============================== almacenamiento ============================== */
 const K = "aena2_";
@@ -64,6 +64,12 @@ const store = {
   // Excepciones por día: { "YYYY-MM-DD": horas }. Lo que no esté aquí usa studyHours.
   get studyDays() { return get("studyDays", {}); },
   set studyDays(v) { set("studyDays", v); },
+  // Ids de preguntas reales ya respondidas alguna vez (para el contador de cobertura).
+  get seenIds() { return get("seenIds", []); },
+  set seenIds(v) { set("seenIds", v); },
+  // Minutos por pregunta de las últimas sesiones: calibra cuánto tardas de verdad.
+  get qMins() { return get("qMins", []); },
+  set qMins(v) { set("qMins", v); },
 };
 
 /* ============================== utilidades DOM ============================== */
@@ -102,12 +108,23 @@ const PLAN_START_MS = new Date(2026, 8, 29, 12, 12).getTime();
 const PLAN_BASE_DONE = LESSONS.findIndex((l) => l.unitId === "w2u2");
 
 const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const hoursForDay = (d) => { const o = store.studyDays[dayKey(d)]; return Number.isFinite(o) ? o : store.studyHours; };
+// Huecos reales de la semana del examen (calendario del usuario + fin de trabajo a las
+// 15:00 ambos días): entre el trabajo/comida y la cena o la salida del viernes.
+// [inicio, fin] en horas locales decimales. Fuera de estos días, 09:00-22:00.
+const STUDY_WINDOWS = {
+  "2026-09-29": [15.5, 21],   // mar: teletrabajo, cena 21:00
+  "2026-09-30": [15.5, 20.5], // mié: teletrabajo, cena adelantada 20:30
+  "2026-10-01": [16, 21],     // jue: oficina (vuelta ~16:00), cena 21:00
+  "2026-10-02": [16, 20],     // vie: oficina, cena fuera 20:30 -> 100 % antes de dormir
+};
+const windowForDay = (d) => STUDY_WINDOWS[dayKey(d)] ?? [9, 22];
+const defaultHoursForDay = (d) => { const w = STUDY_WINDOWS[dayKey(d)]; return w ? w[1] - w[0] : store.studyHours; };
+const hoursForDay = (d) => { const o = store.studyDays[dayKey(d)]; return Number.isFinite(o) ? o : defaultHoursForDay(d); };
 
 function currentPlan(progress) {
   return computePlan({
     total: LESSONS.length, done: totalPassed(progress), baseDone: PLAN_BASE_DONE,
-    startMs: PLAN_START_MS, nowMs: Date.now(), examDate: store.examDate, hoursPerDay: hoursForDay,
+    startMs: PLAN_START_MS, nowMs: Date.now(), examDate: store.examDate, hoursPerDay: hoursForDay, windowFor: windowForDay,
   });
 }
 
@@ -137,6 +154,7 @@ function paintPlanPill(plan, done) {
   $("plan-pop").innerHTML = `<b>${verdict}</b>
     <div>Deberías ir por la lección <b>${Math.round(plan.expected)}</b> ahora mismo; vas por la ${done}.</div>
     <div class="plan-pop__muted">${pace}</div>
+    ${coverageHtml(plan, done)}
     <button type="button" class="btn btn--green btn--wide" data-go="current">Ir a mi lección</button>
     <button type="button" class="btn btn--ghost btn--wide" data-go="target">Ir al objetivo</button>`;
 }
@@ -178,6 +196,24 @@ function paintRail(container, plan, done) {
     <div class="rail__target" style="top:${targetY - top}px"><span>🎯</span></div>`;
   container.appendChild(rail);
   container.dataset.targetY = String(Math.round(targetY));
+}
+
+// Cobertura de reales + si da tiempo, con el ritmo real medido (min/pregunta).
+function coverageHtml(plan, done) {
+  const cov = realCoverage();
+  const qs = store.qMins;
+  const minPerQ = qs.length ? qs.reduce((a, b) => a + b, 0) / qs.length : 0.7;
+  const measured = qs.length >= 2;
+  const lessonsLeft = Math.max(0, LESSONS.length - done);
+  // Camino entero + las reales que aún no habrías visto (peor caso: aparte del camino).
+  const f = feasibility({ remainingUnits: lessonsLeft * QUESTIONS_PER_LESSON + cov.unseen, minutesPerUnit: minPerQ, hoursLeft: plan.hoursLeft });
+  const verdict = f.ok
+    ? `✓ Da tiempo: necesitas ~${f.needed.toFixed(1)} h y tienes ${f.hoursLeft.toFixed(1)} h.`
+    : `✗ Faltan ~${(-f.gap).toFixed(1)} h: necesitas ${f.needed.toFixed(1)} h y tienes ${f.hoursLeft.toFixed(1)} h.`;
+  return `<div class="plan-pop__sep"></div>
+    <div><b>Reales vistas:</b> ${cov.seen}/${cov.total}${cov.unseen ? ` · faltan ${cov.unseen}` : " ✓ todas"}</div>
+    <div class="plan-pop__muted">${verdict} Ritmo ${measured ? "medido" : "supuesto"}: ${Math.round(minPerQ * 60)} s por pregunta.</div>
+    ${cov.unseen ? '<button type="button" class="btn btn--ghost btn--wide" data-go="unseen">Ver reales pendientes</button>' : ""}`;
 }
 
 /* ============================== camino ============================== */
@@ -254,14 +290,14 @@ function renderPath() {
 /* ============================== sesión de lección ============================== */
 const session = {
   items: [], i: 0, correct: 0, hearts: HEARTS,
-  lessonIndex: null, practice: null, review: false, selection: null, answered: false,
+  lessonIndex: null, practice: null, review: false, unseen: false, selection: null, answered: false, startedAt: 0,
 };
 
 function startLesson(index) {
   const l = LESSONS[index];
   session.lessonIndex = index;
   session.practice = null;
-  session.review = false;
+  session.review = false; session.unseen = false;
   session.items = buildLesson(l.sources, l.tier, QUESTIONS_PER_LESSON, { origenFilter: store.origenFilter });
   beginSession(`Mundo ${l.worldIndex + 1} · Unidad ${l.unitIndex + 1} · Lección ${l.lessonIndex + 1}`);
 }
@@ -269,7 +305,7 @@ function startLesson(index) {
 function startPractice(source, tier) {
   session.lessonIndex = null;
   session.practice = { source, tier };
-  session.review = false;
+  session.review = false; session.unseen = false;
   const opts = { origenFilter: store.origenFilter };
   if (source === "listen" && store.listenLevel !== "any") opts.level = store.listenLevel;
   session.items = buildLesson([source], tier, QUESTIONS_PER_LESSON, opts);
@@ -277,6 +313,18 @@ function startPractice(source, tier) {
     ? `Práctica libre · ${SOURCE_LABELS[source]} · ${LISTEN_LEVEL_LABEL[opts.level]}`
     : `Práctica libre · ${SOURCE_LABELS[source]} · nivel ${tier}`;
   beginSession(kicker);
+}
+
+/** Sesión de preguntas reales oficiales que aún no has visto (para llegar al 100 % de cobertura). */
+function startUnseen(n = 10) {
+  const items = buildUnseenLesson(n);
+  if (!items.length) return;
+  session.lessonIndex = null;
+  session.practice = null;
+  session.review = true; // sin vidas ni efecto en el camino
+  session.unseen = true;
+  session.items = items;
+  beginSession(`Reales pendientes · ${items.length} pregunta${items.length === 1 ? "" : "s"}`);
 }
 
 /** Repasa exactamente las preguntas reales falladas la última vez (store.missedIds),
@@ -287,13 +335,14 @@ function startReview() {
   session.lessonIndex = null;
   session.practice = null;
   session.review = true;
+  session.unseen = false;
   session.items = buildReviewLesson(ids);
   const n = session.items.length;
   beginSession(`Repasar fallos · ${n} pregunta${n === 1 ? "" : "s"}`);
 }
 
 function beginSession(kicker) {
-  session.i = 0; session.correct = 0;
+  session.i = 0; session.correct = 0; session.startedAt = Date.now();
   session.hearts = store.heartsOn && session.practice === null && !session.review ? HEARTS : Infinity;
   $("lesson-kicker").textContent = kicker;
   $("lesson-hearts").classList.toggle("hidden", session.hearts === Infinity);
@@ -368,6 +417,8 @@ function evaluate() {
   // recrean cada vez, no hay "la misma" que repasar). Se guarda mientras se siga
   // fallando; se quita en cuanto se acierta -- la lista es "lo que sigue pendiente".
   if (item.isReal && item.id) {
+    const seen = store.seenIds;
+    if (!seen.includes(item.id)) { seen.push(item.id); store.seenIds = seen; setSeenIds(seen); }
     const missed = store.missedIds;
     const idx = missed.indexOf(item.id);
     if (!good && idx === -1) { missed.push(item.id); store.missedIds = missed; }
@@ -472,6 +523,13 @@ function finish() {
   store.xp = store.xp + xpGain;
   bumpStreak();
 
+  // Calibra el ritmo real: minutos por pregunta de esta sesión (se ignoran las que
+  // quedaron abiertas mucho rato, que no reflejan tiempo de estudio).
+  const mins = (Date.now() - session.startedAt) / 60000;
+  if (session.startedAt && total > 0 && mins > 0.2 && mins < 40) {
+    store.qMins = [...store.qMins, mins / total].slice(-10);
+  }
+
   if (session.lessonIndex !== null) {
     const key = LESSONS[session.lessonIndex].key;
     const prog = store.progress;
@@ -481,12 +539,17 @@ function finish() {
   const stillMissed = session.review ? store.missedIds.length : null;
 
   $("results-spark").textContent = ranOut ? "💔" : passed ? (pct === 100 ? "🌟" : "🎉") : "💪";
-  $("results-title").textContent = session.review
+  const cov = realCoverage();
+  $("results-title").textContent = session.unseen
+    ? "Sesión de reales completada"
+    : session.review
     ? (stillMissed === 0 ? "¡Repaso completo!" : "Repaso terminado")
     : ranOut
       ? "Te has quedado sin vidas"
       : pct === 100 ? "¡Perfecto!" : passed ? "¡Lección superada!" : "Casi";
-  $("results-sub").textContent = session.review
+  $("results-sub").textContent = session.unseen
+    ? `Llevas ${cov.seen}/${cov.total} preguntas reales vistas${cov.unseen ? ` (te faltan ${cov.unseen})` : " — ¡todas!"}.`
+    : session.review
     ? (stillMissed === 0
         ? "Ya no te queda ninguna pregunta pendiente de repasar."
         : `Te quedan ${stillMissed} pregunta${stillMissed === 1 ? "" : "s"} por dominar. Repite el repaso cuando quieras.`)
@@ -498,7 +561,7 @@ function finish() {
   $("results-xp").textContent = `+${xpGain}`;
   $("results-acc").textContent = `${pct} %`;
   $("results-acc-badge").className = `badge ${passed ? "badge--acc" : "badge--fail"}`;
-  $("results-repeat").classList.toggle("hidden", stillMissed === 0);
+  $("results-repeat").classList.toggle("hidden", session.unseen ? cov.unseen === 0 : stillMissed === 0);
   show("results");
 }
 
@@ -636,7 +699,7 @@ function paintStudyDays() {
   for (; d < end; d.setDate(d.getDate() + 1)) {
     const k = dayKey(d);
     html += `<label class="study-day"><span>${DIAS[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}</span>
-      <input type="number" min="0" max="16" step="0.5" data-day="${k}" placeholder="${store.studyHours}" value="${Number.isFinite(over[k]) ? over[k] : ""}"></label>`;
+      <input type="number" min="0" max="16" step="0.5" data-day="${k}" placeholder="${defaultHoursForDay(new Date(d))}" value="${Number.isFinite(over[k]) ? over[k] : ""}"></label>`;
   }
   $("study-days").innerHTML = html || `<p class="note">No quedan días hasta el examen.</p>`;
 }
@@ -748,6 +811,7 @@ function goto(name) {
 /* ============================== arranque ============================== */
 function init() {
   applyTheme();
+  setSeenIds(store.seenIds);
 
   document.querySelectorAll(".navbtn").forEach((b) =>
     b.addEventListener("click", () => goto(b.dataset.nav)));
@@ -788,6 +852,7 @@ function init() {
   $("results-continue").addEventListener("click", () => goto("path"));
   $("results-repeat").addEventListener("click", () => {
     if (session.lessonIndex !== null) startLesson(session.lessonIndex);
+    else if (session.unseen) startUnseen();
     else if (session.review) startReview();
     else startPractice(session.practice.source, session.practice.tier);
   });
@@ -845,6 +910,7 @@ function init() {
     const go = e.target.closest("[data-go]")?.dataset.go;
     if (!go) return;
     if (go === "review") { $("plan-pop").classList.add("hidden"); startReview(); return; }
+    if (go === "unseen") { $("plan-pop").classList.add("hidden"); startUnseen(); return; }
     const path = $("path");
     const y = go === "target"
       ? Number(path.dataset.targetY)

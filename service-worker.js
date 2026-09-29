@@ -1,6 +1,6 @@
 // Service worker — cachea el shell estático para uso offline básico.
 // Sube CACHE_VERSION cuando cambies archivos precacheados para forzar la actualización.
-const CACHE_VERSION = "v21";
+const CACHE_VERSION = "v22";
 const CACHE_NAME = `aena-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -35,7 +35,12 @@ const PRECACHE_URLS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).then(() => self.skipWaiting())
+    // cache:"reload" salta la caché HTTP del navegador: GitHub Pages sirve max-age=600, y
+    // con addAll() a secas una versión nueva podía precachear ficheros de la anterior
+    // (subidas con <10 min de diferencia) y quedarse "actualizada" con el código viejo.
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_URLS.map((u) => new Request(u, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
   );
 });
 

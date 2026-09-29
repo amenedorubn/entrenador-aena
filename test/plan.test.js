@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { studyHoursBetween, computePlan, examMs } from "../js/plan.js";
+import { studyHoursBetween, computePlan, examMs, feasibility } from "../js/plan.js";
 
 const at = (y, m, d, h = 0, min = 0) => new Date(y, m - 1, d, h, min).getTime();
 
@@ -45,5 +45,27 @@ describe("hoursPerDay como función (horas distintas por día)", () => {
     const p = computePlan({ total: 158, done: 28, baseDone: 28, startMs: at(2026, 9, 29, 12, 12), nowMs: at(2026, 9, 29, 12, 12), examDate: "2026-10-03", hoursPerDay: hours });
     expect(Number.isFinite(p.perDay)).toBe(true);
     expect(p.hoursLeft).toBeGreaterThan(0);
+  });
+});
+
+describe("ventanas de estudio por día", () => {
+  const win = (d) => (d.getDate() === 30 ? [15.5, 20.5] : [16, 20]);
+  it("solo cuenta dentro de la ventana", () => {
+    // 30/9: ventana 15:30-20:30 (5 h) con 5 h/día -> 15:30-18:00 = 2,5 h
+    expect(studyHoursBetween(at(2026, 9, 30, 15, 30), at(2026, 9, 30, 18, 0), 5, win)).toBeCloseTo(2.5, 6);
+    expect(studyHoursBetween(at(2026, 9, 30, 0, 0), at(2026, 9, 30, 15, 0), 5, win)).toBe(0);
+  });
+  it("el ritmo esperado no avanza fuera de la ventana", () => {
+    const base = { total: 158, baseDone: 28, done: 28, startMs: at(2026, 9, 29, 12, 12), examDate: "2026-10-03", hoursPerDay: 5, windowFor: win };
+    const a = computePlan({ ...base, nowMs: at(2026, 9, 30, 8, 0) }).expected;
+    const b = computePlan({ ...base, nowMs: at(2026, 9, 30, 14, 0) }).expected;
+    expect(b).toBeCloseTo(a, 6);
+  });
+});
+
+describe("feasibility", () => {
+  it("compara horas necesarias con las que quedan", () => {
+    expect(feasibility({ remainingUnits: 600, minutesPerUnit: 0.5, hoursLeft: 6 })).toMatchObject({ needed: 5, ok: true });
+    expect(feasibility({ remainingUnits: 600, minutesPerUnit: 0.5, hoursLeft: 4 }).ok).toBe(false);
   });
 });

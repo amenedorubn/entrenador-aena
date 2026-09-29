@@ -81,9 +81,41 @@ function buildRealQueue(cats, tier, origenFilter) {
   const pool = REAL.filter((r) =>
     cats.includes(r.category) && r.status !== "revision" &&
     (origenFilter === "todas" || origenFilter === undefined || r.origen === origenFilter));
-  const near = pool.filter((r) => Math.abs(r.lvl - tier) <= 1);
-  const rest = pool.filter((r) => Math.abs(r.lvl - tier) > 1);
-  return [...shuffle(near), ...shuffle(rest)];
+  // Primero las que el usuario aún no ha visto (para llegar al 100 % de cobertura), y
+  // dentro de cada grupo las de nivel cercano antes que el resto.
+  const groups = [[], [], [], []]; // no vistas cerca, no vistas resto, vistas cerca, vistas resto
+  for (const r of pool) {
+    const near = Math.abs(r.lvl - tier) <= 1;
+    groups[(seenIds.has(r.id) ? 2 : 0) + (near ? 0 : 1)].push(r);
+  }
+  return groups.flatMap((g) => shuffle(g));
+}
+
+/* ============================== cobertura de reales ============================== */
+// Ids de preguntas reales ya respondidas alguna vez (persistidos por app.js, aquí solo
+// se reciben). Cuentan solo las oficiales servibles: las variantes derivan de ellas y
+// las "revision" no se sirven nunca.
+let seenIds = new Set();
+export function setSeenIds(ids) { seenIds = new Set(ids); }
+const servibleOficial = (q) => q.origen === "oficial" && q.status !== "revision";
+
+/** {seen, total, unseen}: cobertura del banco oficial servible. */
+export function realCoverage() {
+  const pool = REAL.filter(servibleOficial);
+  const seen = pool.filter((q) => seenIds.has(q.id)).length;
+  return { seen, total: pool.length, unseen: pool.length - seen };
+}
+
+/** Sesión de hasta n preguntas oficiales aún no vistas (de cualquier categoría, orden barajado). */
+export function buildUnseenLesson(n = 10) {
+  const pool = shuffle(REAL.filter((q) => servibleOficial(q) && !seenIds.has(q.id)));
+  const items = [];
+  for (const q of pool) {
+    if (items.length >= n) break;
+    const it = toRealItem(q, CATEGORY_SOURCE[q.category], q.lvl ?? 3);
+    if (it) items.push(it);
+  }
+  return items;
 }
 
 /**

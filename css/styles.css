@@ -514,3 +514,4 @@ button { font-family: inherit; cursor: pointer; }
 .plan-pop .btn { min-height: 40px; }
 .study-day { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; font-weight: 800; }
 .study-day input { width: 84px; font-family: inherit; font-weight: 800; padding: 8px; border-radius: 12px; border: 2px solid var(--border); background: var(--surface); color: var(--text); min-height: 40px; }
+.plan-pop__sep { border-top: 2px solid var(--border); margin: 4px 0; }
