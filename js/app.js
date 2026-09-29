@@ -117,6 +117,15 @@ function paintPlanPill(plan, done) {
   const gap = Math.round(plan.ahead);
   const state = gap >= 0 ? "ok" : gap > -6 ? "warn" : "bad";
   const pill = $("plan-pill");
+  if (done >= total) {
+    // Meta cumplida: el 100 % del camino es el objetivo; lo que sobre de tiempo, repaso.
+    pill.className = "plan-pill plan-pill--ok";
+    pill.textContent = `✓ 100 % · ${total}/${total}`;
+    $("plan-pop").innerHTML = `<b>¡Has visto todo el camino!</b>
+      <div class="plan-pop__muted">Con el tiempo que quede: repasa lo que has fallado.</div>
+      <button type="button" class="btn btn--green btn--wide" data-go="review">Repasar fallos</button>`;
+    return;
+  }
   pill.className = `plan-pill plan-pill--${state}`;
   pill.textContent = `${gap >= 0 ? "▲ +" : "▼ "}${gap} · ${done}/${total}`;
   const verdict = gap >= 0
@@ -166,7 +175,7 @@ function paintRail(container, plan, done) {
   rail.setAttribute("aria-hidden", "true");
   rail.style.cssText = `top:${top}px;height:${bottom - top}px`;
   rail.innerHTML = `<div class="rail__fill" style="height:${Math.max(0, fillTo - top)}px"></div>
-    <div class="rail__target" style="top:${targetY - top}px"><span>objetivo</span></div>`;
+    <div class="rail__target" style="top:${targetY - top}px"><span>🎯</span></div>`;
   container.appendChild(rail);
   container.dataset.targetY = String(Math.round(targetY));
 }
@@ -835,6 +844,7 @@ function init() {
   $("plan-pop").addEventListener("click", (e) => {
     const go = e.target.closest("[data-go]")?.dataset.go;
     if (!go) return;
+    if (go === "review") { $("plan-pop").classList.add("hidden"); startReview(); return; }
     const path = $("path");
     const y = go === "target"
       ? Number(path.dataset.targetY)
