@@ -159,7 +159,7 @@ button { font-family: inherit; cursor: pointer; }
    overflow-x como "auto" también (regla de la spec cuando un eje no es "visible" y el
    otro sí) -> el camino se podía arrastrar hacia los lados por los translateX de
    .node-row (el efecto serpenteante), y aquí solo debe scrollear en vertical. */
-.path { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 16px 0 calc(var(--navh) + env(safe-area-inset-bottom) + 16px); }
+.path { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 16px 0 calc(var(--navh) + env(safe-area-inset-bottom) + 16px); }
 
 .unit-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -497,3 +497,15 @@ button { font-family: inherit; cursor: pointer; }
 .qcard__motivo { display: inline-block; font-size: 12px; font-weight: 800; color: #fff; background: var(--red); border-radius: 999px; padding: 2px 10px; margin-bottom: 6px; }
 .qcard__warn { font-size: 13px; font-weight: 800; color: var(--red); margin: 0 0 8px; }
 .qcard__actions { display: flex; gap: 8px; margin-top: 6px; }
+
+/* Ritmo hasta el examen */
+.plan-card { margin: 0 16px 8px 26px; padding: 12px 14px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface); font-size: 14px; font-weight: 700; }
+.plan-card__head { display: flex; justify-content: space-between; font-size: 16px; margin-bottom: 4px; }
+.plan-card--ok { border-color: var(--green); }
+.plan-card--warn { border-color: #ff9600; }
+.plan-card--bad { border-color: var(--red); }
+.plan-card__pace { color: var(--muted); font-size: 13px; }
+.rail { position: absolute; left: 8px; width: 8px; border-radius: 999px; background: var(--border); z-index: 2; pointer-events: none; }
+.rail__fill { position: absolute; top: 0; left: 0; right: 0; border-radius: 999px; background: var(--green); }
+.rail__target { position: absolute; left: -5px; width: 18px; height: 0; border-top: 3px solid var(--red); }
+.rail__target span { position: absolute; left: 22px; top: -9px; font-size: 10px; font-weight: 800; color: #fff; background: var(--red); border-radius: 6px; padding: 1px 6px; }

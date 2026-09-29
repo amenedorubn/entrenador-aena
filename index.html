@@ -195,6 +195,10 @@
         <input type="date" id="exam-date" style="font-family:inherit;font-weight:800;padding:10px;border-radius:12px;border:2px solid var(--border);background:var(--surface);color:var(--text);min-height:44px">
       </div>
       <div class="row">
+        <div><div class="row__label">Horas de estudio al día</div><div class="row__hint">Solo las libres de verdad: calcula tu ritmo objetivo</div></div>
+        <input type="number" id="study-hours" min="1" max="16" step="0.5" style="width:84px;font-family:inherit;font-weight:800;padding:10px;border-radius:12px;border:2px solid var(--border);background:var(--surface);color:var(--text);min-height:44px">
+      </div>
+      <div class="row">
         <div><div class="row__label">Origen de las preguntas</div><div class="row__hint">Mismo filtro que en Práctica libre</div></div>
         <div class="segmented" id="settings-origen-filter" role="group" aria-label="Filtro de origen">
           <button type="button" data-origen="oficial" aria-pressed="false">Oficiales</button>

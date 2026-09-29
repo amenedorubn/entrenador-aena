@@ -10,6 +10,7 @@ import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/compete
 import { loadReal, REAL } from "../data/real.js";
 import { choice, shuffle } from "./rng.js";
 import { APP_VERSION } from "./version.js";
+import { computePlan } from "./plan.js";
 
 /* ============================== almacenamiento ============================== */
 const K = "aena2_";
@@ -56,6 +57,10 @@ const store = {
   // `auto` = lo registró la app al detectar la imagen rota, sin intervención del usuario.
   get reportedIds() { return get("reportedIds", []); },
   set reportedIds(v) { set("reportedIds", v); },
+  // Horas de estudio reales al día (sin dormir/trabajo/comidas/deporte); base del ritmo
+  // objetivo de la barra lateral del camino. Ver js/plan.js.
+  get studyHours() { return get("studyHours", 5); },
+  set studyHours(v) { set("studyHours", v); },
 };
 
 /* ============================== utilidades DOM ============================== */
@@ -88,12 +93,70 @@ function daysLeft() {
   return Math.max(0, Math.ceil((target - new Date()) / 86400000));
 }
 
+/* ============================== ritmo hasta el examen ============================== */
+// Punto de partida del plan: martes 29/9/2026 12:12, con todo lo anterior a w2u2 hecho.
+const PLAN_START_MS = new Date(2026, 8, 29, 12, 12).getTime();
+const PLAN_BASE_DONE = LESSONS.findIndex((l) => l.unitId === "w2u2");
+
+function currentPlan(progress) {
+  return computePlan({
+    total: LESSONS.length, done: totalPassed(progress), baseDone: PLAN_BASE_DONE,
+    startMs: PLAN_START_MS, nowMs: Date.now(), examDate: store.examDate, hoursPerDay: store.studyHours,
+  });
+}
+
+function planCardHtml(plan, done) {
+  const total = LESSONS.length;
+  const gap = Math.round(plan.ahead);
+  const state = gap >= 0 ? "ok" : gap > -6 ? "warn" : "bad";
+  const verdict = gap >= 0
+    ? `Vas ${gap === 0 ? "al día" : `${gap} lección${gap === 1 ? "" : "es"} por delante`} ✓`
+    : `Vas ${-gap} lección${gap === -1 ? "" : "es"} por detrás`;
+  const pace = Number.isFinite(plan.perHour)
+    ? `Te quedan ${plan.remaining} lecciones en ~${Math.round(plan.hoursLeft)} h de estudio: ${plan.perHour.toFixed(1)} por hora (${Math.ceil(plan.perDay)} al día).`
+    : plan.remaining ? "Ya no quedan horas de estudio antes del examen." : "¡Camino completo!";
+  return `<div class="plan-card plan-card--${state}">
+      <div class="plan-card__head"><b>${verdict}</b><span>${done}/${total}</span></div>
+      <div class="plan-card__row">Deberías ir por la lección <b>${Math.round(plan.expected)}</b> ahora mismo.</div>
+      <div class="plan-card__row plan-card__pace">${pace}</div>
+    </div>`;
+}
+
+// Barra vertical pegada al borde: relleno hasta el nodo actual y marca "objetivo" en el
+// nodo que tocaría ahora. Se alinea con los nodos reales (medidos), no con un % del alto.
+function paintRail(container, plan, done) {
+  container.querySelector(".rail")?.remove();
+  const nodes = [...container.querySelectorAll(".node[data-lesson]")];
+  if (!nodes.length) return;
+  const base = container.getBoundingClientRect().top - container.scrollTop;
+  const y = (i) => {
+    const r = nodes[Math.min(Math.max(i, 0), nodes.length - 1)].getBoundingClientRect();
+    return r.top - base + r.height / 2;
+  };
+  const yAt = (v) => {
+    const lo = Math.floor(v), hi = Math.min(lo + 1, nodes.length - 1);
+    return y(lo - 1) + (y(hi - 1) - y(lo - 1)) * (v - lo);
+  };
+  const top = y(0) - 20;
+  const bottom = y(nodes.length - 1) + 20;
+  const fillTo = done > 0 ? yAt(done) : top;
+  const targetY = yAt(Math.min(Math.max(plan.expected, 0.01), nodes.length));
+  const rail = document.createElement("div");
+  rail.className = "rail";
+  rail.setAttribute("aria-hidden", "true");
+  rail.style.cssText = `top:${top}px;height:${bottom - top}px`;
+  rail.innerHTML = `<div class="rail__fill" style="height:${Math.max(0, fillTo - top)}px"></div>
+    <div class="rail__target" style="top:${targetY - top}px"><span>objetivo</span></div>`;
+  container.appendChild(rail);
+}
+
 /* ============================== camino ============================== */
 function renderPath() {
   const progress = store.progress;
   const container = $("path");
   const current = currentLessonIndex(progress);
-  let html = "";
+  const plan = currentPlan(progress);
+  let html = planCardHtml(plan, totalPassed(progress));
   let flat = 0;
 
   WORLDS.forEach((w, wi) => {
@@ -148,6 +211,7 @@ function renderPath() {
   container.querySelectorAll("[data-trophy]").forEach((b) =>
     b.addEventListener("click", () => alert("¡Unidad completada! Sigue avanzando por el camino.")));
 
+  paintRail(container, plan, totalPassed(progress));
   $("days").textContent = daysLeft();
   $("streak").textContent = store.streak;
   $("xp").textContent = store.xp;
@@ -539,6 +603,7 @@ function renderSettings() {
   document.querySelectorAll("#hearts-picker button").forEach((b) =>
     b.setAttribute("aria-pressed", String((b.dataset.hearts === "on") === store.heartsOn)));
   $("exam-date").value = store.examDate;
+  $("study-hours").value = store.studyHours;
   $("app-version").textContent = APP_VERSION;
   paintOrigenFilter("#settings-origen-filter");
 
@@ -709,6 +774,10 @@ function init() {
     b.addEventListener("click", () => { store.heartsOn = b.dataset.hearts === "on"; renderSettings(); }));
   $("exam-date").addEventListener("change", (e) => {
     if (e.target.value) { store.examDate = e.target.value; renderPath(); }
+  });
+  $("study-hours").addEventListener("change", (e) => {
+    const h = Number(e.target.value);
+    if (h > 0 && h <= 16) { store.studyHours = h; renderPath(); }
   });
 
   $("reset-progress").addEventListener("click", () => {
