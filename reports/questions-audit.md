@@ -77,13 +77,13 @@ Ninguno. (Nota: una comprobación ingenua solo por texto de prompt da 60 falsos 
 |---|---|---|
 | analogias | 126 | 0 |
 | domino | 19 | 0 |
-| figuras_no_relacionadas | 50 | 3 |
+| figuras_no_relacionadas | 50 | 0 |
 | ingles_b1 | 50 | 0 |
 | ingles_b2 | 50 | 0 |
 | matrices | 73 | 0 |
 | razonamiento_numerico | 40 | 0 |
 | relojes | 40 | 0 |
 | secuencia_num_letras | 39 | 0 |
-| series_figuras | 77 | 5 |
+| series_figuras | 77 | 1 |
 | series_numeros | 60 | 0 |
 | sinonimos_antonimos | 93 | 1 |

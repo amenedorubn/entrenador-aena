@@ -268,6 +268,13 @@
       <p class="feedback__solution hidden" id="feedback-solution"></p>
       <p class="feedback__text" id="feedback-text"></p>
       <button type="button" class="link-btn hidden" id="feedback-report">⚠️ Reportar fallo en esta pregunta</button>
+      <div class="report-panel hidden" id="feedback-report-panel" role="group" aria-label="Motivo del reporte">
+        <p class="note">¿Qué le pasa a esta pregunta?</p>
+        <button type="button" class="btn btn--ghost btn--wide" data-motivo="imagen">🖼️ Falta la imagen o no se ve</button>
+        <button type="button" class="btn btn--ghost btn--wide" data-motivo="clave">✅ La respuesta correcta está mal</button>
+        <button type="button" class="btn btn--ghost btn--wide" data-motivo="enunciado">📝 Enunciado u opciones raros o incompletos</button>
+        <button type="button" class="btn btn--ghost btn--wide" data-motivo="otro">❓ Otro motivo</button>
+      </div>
       <button type="button" class="btn btn--green btn--wide" id="feedback-next">Continuar</button>
     </div>
   </div>

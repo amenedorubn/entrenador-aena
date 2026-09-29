@@ -490,3 +490,10 @@ button { font-family: inherit; cursor: pointer; }
   .node { width: 60px; height: 56px; font-size: 22px; }
   .question { font-size: 19px; }
 }
+
+/* Reporte de pregunta con motivo */
+.report-panel { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.report-panel .btn { text-align: left; }
+.qcard__motivo { display: inline-block; font-size: 12px; font-weight: 800; color: #fff; background: var(--red); border-radius: 999px; padding: 2px 10px; margin-bottom: 6px; }
+.qcard__warn { font-size: 13px; font-weight: 800; color: var(--red); margin: 0 0 8px; }
+.qcard__actions { display: flex; gap: 8px; margin-top: 6px; }

@@ -50,7 +50,10 @@ const store = {
   get missedIds() { return get("missedIds", []); },
   set missedIds(v) { set("missedIds", v); },
   // Preguntas reales que el propio usuario marcó con "Reportar fallo" tras responder.
-  // [{ id, ts }]. Solo se guarda una vez por id (reportar dos veces actualiza ts).
+  // [{ id, ts, motivo, elegida, imgOk, prompt, auto }]. Solo se guarda una vez por id
+  // (reportar dos veces actualiza el registro). `prompt` es una copia del enunciado para
+  // poder recordar de qué iba aunque el banco cambie; `imgOk` false = la imagen no cargó;
+  // `auto` = lo registró la app al detectar la imagen rota, sin intervención del usuario.
   get reportedIds() { return get("reportedIds", []); },
   set reportedIds(v) { set("reportedIds", v); },
 };
@@ -302,11 +305,19 @@ function evaluate() {
   $("feedback-text").innerHTML = text;
 
   const reportBtn = $("feedback-report");
+  $("feedback-report-panel").classList.add("hidden");
   if (item.isReal && item.id) {
     reportBtn.classList.remove("hidden");
     reportBtn.disabled = false;
     reportBtn.textContent = "⚠️ Reportar fallo en esta pregunta";
     reportBtn.dataset.id = item.id;
+    // Imagen que no carga: fallo objetivo, se registra solo (no depende de que el
+    // usuario se acuerde de reportarlo) y el botón ya lo refleja.
+    if (currentImageBroken(item)) {
+      saveReport(item, "imagen", { auto: true });
+      reportBtn.textContent = "✓ Imagen rota registrada automáticamente";
+      reportBtn.disabled = true;
+    }
   } else {
     reportBtn.classList.add("hidden");
   }
@@ -316,6 +327,36 @@ function evaluate() {
   const outOfHearts = session.hearts === 0;
   $("feedback-next").textContent = outOfHearts ? "Ver resultado" : isLast ? "Ver resultado" : "Continuar";
   $("feedback-next").focus();
+}
+
+const MOTIVOS = {
+  imagen: "Falta la imagen o no se ve",
+  clave: "Respuesta correcta mal",
+  enunciado: "Enunciado u opciones raros",
+  otro: "Otro motivo",
+};
+
+// true si la pregunta lleva imagen y el <img> ya terminó de cargar sin píxeles (404 o
+// fichero corrupto). Se llama tras responder, con la imagen ya tenida tiempo de cargar.
+function currentImageBroken(item) {
+  if (!item.image) return false;
+  const img = $("lesson-question").querySelector("img");
+  return !img || (img.complete && img.naturalWidth === 0);
+}
+
+function saveReport(item, motivo, { auto = false } = {}) {
+  const list = store.reportedIds;
+  const prev = list.find((r) => r.id === item.id);
+  // Un reporte manual pisa a uno automático; uno automático nunca pisa a uno manual.
+  if (prev && auto && !prev.auto) return;
+  const entry = {
+    id: item.id, ts: Date.now(), motivo, auto,
+    elegida: Number.isInteger(session.selection) ? session.selection : null,
+    imgOk: item.image ? !currentImageBroken(item) : null,
+    prompt: String(item.prompt ?? "").slice(0, 240),
+  };
+  if (prev) Object.assign(prev, entry); else list.push(entry);
+  store.reportedIds = list;
 }
 
 function nextItem() {
@@ -537,12 +578,24 @@ function renderQuality() {
         .map((r) => {
           const q = REAL.find((x) => x.id === r.id);
           const when = new Date(r.ts).toLocaleDateString("es-ES");
-          return q
-            ? qualityCard(q, `Reportada por ti el ${when}.`, { showCorrect: true })
-            : `<div class="qcard"><div class="qcard__id">${r.id}</div><p class="note">Ya no existe en el banco actual (reportada el ${when}).</p></div>`;
+          const motivo = `<span class="qcard__motivo">${MOTIVOS[r.motivo] ?? "Sin motivo (reporte antiguo)"}${r.auto ? " · automático" : ""}</span>`;
+          const elegida = Number.isInteger(r.elegida) ? ` Marcaste ${"ABCDEF"[r.elegida]}.` : "";
+          const note = `Reportada el ${when}.${elegida}`;
+          const body = q
+            ? qualityCard(q, note, { showCorrect: true })
+            : `<div class="qcard"><div class="qcard__id">${r.id}</div>${r.prompt ? `<p class="qcard__prompt">${r.prompt}</p>` : ""}<p class="note">Ya no existe en el banco actual. ${note}</p></div>`;
+          const actions = `<div class="qcard__actions"><button type="button" class="btn btn--ghost" data-resolver="${r.id}">✓ Ya está arreglada, quitar</button></div>`;
+          return `<div class="qwrap">${motivo}${body}${actions}</div>`;
         })
         .join("")
     : `<p class="note">No has reportado ninguna pregunta todavía.</p>`;
+
+  // Comprobación en vivo: si la imagen no carga ahora mismo, se avisa en la tarjeta.
+  document.querySelectorAll("#q-reported-list .qcard__img, #q-revision-list .qcard__img").forEach((img) => {
+    const warn = () => img.insertAdjacentHTML("afterend", `<p class="qcard__warn">⚠️ Esta imagen no carga (${img.getAttribute("src")})</p>`);
+    if (img.complete && img.naturalWidth === 0) warn();
+    else img.addEventListener("error", warn, { once: true });
+  });
 }
 
 function copyQualityReport() {
@@ -554,7 +607,14 @@ function copyQualityReport() {
   lines.push(`\nReportadas por ti (${reported.length}):`);
   for (const r of reported) {
     const q = REAL.find((x) => x.id === r.id);
-    lines.push(`- ${r.id} (${new Date(r.ts).toLocaleDateString("es-ES")})${q ? `: "${q.prompt}"` : " — ya no existe en el banco"}`);
+    const motivo = MOTIVOS[r.motivo] ?? "sin motivo";
+    const extra = [
+      r.auto ? "detectado automáticamente" : null,
+      r.imgOk === false ? `imagen rota (${q?.image ?? "?"})` : null,
+      Number.isInteger(r.elegida) ? `marqué ${"ABCDEF"[r.elegida]}` : null,
+      q && Number.isInteger(q.correctIndex) ? `clave actual ${"ABCDEF"[q.correctIndex]}` : null,
+    ].filter(Boolean).join("; ");
+    lines.push(`- ${r.id} [${motivo}] (${new Date(r.ts).toLocaleDateString("es-ES")})${extra ? ` {${extra}}` : ""}: ${q ? `"${q.prompt}"` : `${r.prompt ? `"${r.prompt}" ` : ""}— ya no existe en el banco`}`);
   }
   const text = lines.join("\n");
   const status = $("q-copy-status");
@@ -585,16 +645,25 @@ function init() {
   $("settings-quality-btn").addEventListener("click", () => goto("quality"));
   $("quality-back").addEventListener("click", () => goto("settings"));
   $("q-copy-btn").addEventListener("click", copyQualityReport);
-  $("feedback-report").addEventListener("click", (e) => {
-    const id = e.currentTarget.dataset.id;
+  $("feedback-report").addEventListener("click", () => {
+    $("feedback-report-panel").classList.toggle("hidden");
+  });
+  $("feedback-report-panel").addEventListener("click", (e) => {
+    const motivo = e.target.closest("[data-motivo]")?.dataset.motivo;
+    const item = session.items[session.i];
+    if (!motivo || !item?.id) return;
+    saveReport(item, motivo);
+    $("feedback-report-panel").classList.add("hidden");
+    const btn = $("feedback-report");
+    btn.textContent = `✓ Reportado: ${MOTIVOS[motivo]}`;
+    btn.disabled = true;
+  });
+  $("q-reported-list").addEventListener("click", (e) => {
+    const id = e.target.closest("[data-resolver]")?.dataset.resolver;
     if (!id) return;
-    const list = store.reportedIds;
-    const existing = list.find((r) => r.id === id);
-    if (existing) existing.ts = Date.now();
-    else list.push({ id, ts: Date.now() });
-    store.reportedIds = list;
-    e.currentTarget.textContent = "✓ Reportado, gracias";
-    e.currentTarget.disabled = true;
+    store.reportedIds = store.reportedIds.filter((r) => r.id !== id);
+    renderQuality();
+    renderSettings();
   });
 
   $("check-btn").addEventListener("click", evaluate);
