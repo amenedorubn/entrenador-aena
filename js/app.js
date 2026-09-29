@@ -61,6 +61,9 @@ const store = {
   // objetivo de la barra lateral del camino. Ver js/plan.js.
   get studyHours() { return get("studyHours", 5); },
   set studyHours(v) { set("studyHours", v); },
+  // Excepciones por día: { "YYYY-MM-DD": horas }. Lo que no esté aquí usa studyHours.
+  get studyDays() { return get("studyDays", {}); },
+  set studyDays(v) { set("studyDays", v); },
 };
 
 /* ============================== utilidades DOM ============================== */
@@ -98,49 +101,66 @@ function daysLeft() {
 const PLAN_START_MS = new Date(2026, 8, 29, 12, 12).getTime();
 const PLAN_BASE_DONE = LESSONS.findIndex((l) => l.unitId === "w2u2");
 
+const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const hoursForDay = (d) => { const o = store.studyDays[dayKey(d)]; return Number.isFinite(o) ? o : store.studyHours; };
+
 function currentPlan(progress) {
   return computePlan({
     total: LESSONS.length, done: totalPassed(progress), baseDone: PLAN_BASE_DONE,
-    startMs: PLAN_START_MS, nowMs: Date.now(), examDate: store.examDate, hoursPerDay: store.studyHours,
+    startMs: PLAN_START_MS, nowMs: Date.now(), examDate: store.examDate, hoursPerDay: hoursForDay,
   });
 }
 
-function planCardHtml(plan, done) {
+// Botón flotante fijo arriba del camino (siempre visible al hacer scroll) + detalle al pulsarlo.
+function paintPlanPill(plan, done) {
   const total = LESSONS.length;
   const gap = Math.round(plan.ahead);
   const state = gap >= 0 ? "ok" : gap > -6 ? "warn" : "bad";
+  const pill = $("plan-pill");
+  pill.className = `plan-pill plan-pill--${state}`;
+  pill.textContent = `${gap >= 0 ? "▲ +" : "▼ "}${gap} · ${done}/${total}`;
   const verdict = gap >= 0
     ? `Vas ${gap === 0 ? "al día" : `${gap} lección${gap === 1 ? "" : "es"} por delante`} ✓`
     : `Vas ${-gap} lección${gap === -1 ? "" : "es"} por detrás`;
   const pace = Number.isFinite(plan.perHour)
-    ? `Te quedan ${plan.remaining} lecciones en ~${Math.round(plan.hoursLeft)} h de estudio: ${plan.perHour.toFixed(1)} por hora (${Math.ceil(plan.perDay)} al día).`
+    ? `Te quedan ${plan.remaining} lecciones en ~${Math.round(plan.hoursLeft)} h de estudio: ${plan.perHour.toFixed(1)} por hora (${Math.ceil(plan.perDay)} en un día típico).`
     : plan.remaining ? "Ya no quedan horas de estudio antes del examen." : "¡Camino completo!";
-  return `<div class="plan-card plan-card--${state}">
-      <div class="plan-card__head"><b>${verdict}</b><span>${done}/${total}</span></div>
-      <div class="plan-card__row">Deberías ir por la lección <b>${Math.round(plan.expected)}</b> ahora mismo.</div>
-      <div class="plan-card__row plan-card__pace">${pace}</div>
-    </div>`;
+  $("plan-pop").innerHTML = `<b>${verdict}</b>
+    <div>Deberías ir por la lección <b>${Math.round(plan.expected)}</b> ahora mismo; vas por la ${done}.</div>
+    <div class="plan-pop__muted">${pace}</div>
+    <button type="button" class="btn btn--green btn--wide" data-go="current">Ir a mi lección</button>
+    <button type="button" class="btn btn--ghost btn--wide" data-go="target">Ir al objetivo</button>`;
+}
+
+function refreshPlan() {
+  const progress = store.progress;
+  const plan = currentPlan(progress);
+  const done = totalPassed(progress);
+  paintPlanPill(plan, done);
+  paintRail($("path"), plan, done);
 }
 
 // Barra vertical pegada al borde: relleno hasta el nodo actual y marca "objetivo" en el
-// nodo que tocaría ahora. Se alinea con los nodos reales (medidos), no con un % del alto.
+// nodo que tocaría ahora. Se alinea con los nodos reales (medidos), así que solo puede
+// pintarse con el camino visible (con display:none todos los rects son 0): por eso se
+// llama tras show("path") y no dentro de renderPath.
 function paintRail(container, plan, done) {
   container.querySelector(".rail")?.remove();
   const nodes = [...container.querySelectorAll(".node[data-lesson]")];
-  if (!nodes.length) return;
+  if (!nodes.length || !container.offsetParent) return;
   const base = container.getBoundingClientRect().top - container.scrollTop;
   const y = (i) => {
     const r = nodes[Math.min(Math.max(i, 0), nodes.length - 1)].getBoundingClientRect();
     return r.top - base + r.height / 2;
   };
   const yAt = (v) => {
-    const lo = Math.floor(v), hi = Math.min(lo + 1, nodes.length - 1);
+    const lo = Math.floor(v), hi = Math.min(lo + 1, nodes.length);
     return y(lo - 1) + (y(hi - 1) - y(lo - 1)) * (v - lo);
   };
   const top = y(0) - 20;
   const bottom = y(nodes.length - 1) + 20;
   const fillTo = done > 0 ? yAt(done) : top;
-  const targetY = yAt(Math.min(Math.max(plan.expected, 0.01), nodes.length));
+  const targetY = yAt(Math.min(Math.max(plan.expected, 1), nodes.length));
   const rail = document.createElement("div");
   rail.className = "rail";
   rail.setAttribute("aria-hidden", "true");
@@ -148,6 +168,7 @@ function paintRail(container, plan, done) {
   rail.innerHTML = `<div class="rail__fill" style="height:${Math.max(0, fillTo - top)}px"></div>
     <div class="rail__target" style="top:${targetY - top}px"><span>objetivo</span></div>`;
   container.appendChild(rail);
+  container.dataset.targetY = String(Math.round(targetY));
 }
 
 /* ============================== camino ============================== */
@@ -155,8 +176,7 @@ function renderPath() {
   const progress = store.progress;
   const container = $("path");
   const current = currentLessonIndex(progress);
-  const plan = currentPlan(progress);
-  let html = planCardHtml(plan, totalPassed(progress));
+  let html = "";
   let flat = 0;
 
   WORLDS.forEach((w, wi) => {
@@ -211,7 +231,7 @@ function renderPath() {
   container.querySelectorAll("[data-trophy]").forEach((b) =>
     b.addEventListener("click", () => alert("¡Unidad completada! Sigue avanzando por el camino.")));
 
-  paintRail(container, plan, totalPassed(progress));
+  refreshPlan();
   $("days").textContent = daysLeft();
   $("streak").textContent = store.streak;
   $("xp").textContent = store.xp;
@@ -598,12 +618,27 @@ function nextCompItem() {
 }
 
 /* ============================== ajustes ============================== */
+const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+function paintStudyDays() {
+  const end = new Date(`${store.examDate}T00:00:00`);
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  const over = store.studyDays;
+  let html = "";
+  for (; d < end; d.setDate(d.getDate() + 1)) {
+    const k = dayKey(d);
+    html += `<label class="study-day"><span>${DIAS[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}</span>
+      <input type="number" min="0" max="16" step="0.5" data-day="${k}" placeholder="${store.studyHours}" value="${Number.isFinite(over[k]) ? over[k] : ""}"></label>`;
+  }
+  $("study-days").innerHTML = html || `<p class="note">No quedan días hasta el examen.</p>`;
+}
+
 function renderSettings() {
   applyTheme();
   document.querySelectorAll("#hearts-picker button").forEach((b) =>
     b.setAttribute("aria-pressed", String((b.dataset.hearts === "on") === store.heartsOn)));
   $("exam-date").value = store.examDate;
   $("study-hours").value = store.studyHours;
+  paintStudyDays();
   $("app-version").textContent = APP_VERSION;
   paintOrigenFilter("#settings-origen-filter");
 
@@ -697,6 +732,8 @@ function goto(name) {
   if (name === "quality") renderQuality();
   if (name === "speaking") { newPrompt(); resetSpeak(); }
   show(name);
+  // La barra se mide contra los nodos, que solo tienen tamaño con la pantalla ya visible.
+  if (name === "path") requestAnimationFrame(refreshPlan);
 }
 
 /* ============================== arranque ============================== */
@@ -777,8 +814,36 @@ function init() {
   });
   $("study-hours").addEventListener("change", (e) => {
     const h = Number(e.target.value);
-    if (h > 0 && h <= 16) { store.studyHours = h; renderPath(); }
+    if (h > 0 && h <= 16) { store.studyHours = h; renderPath(); paintStudyDays(); }
   });
+  $("study-days").addEventListener("change", (e) => {
+    const k = e.target.dataset.day;
+    if (!k) return;
+    const map = store.studyDays;
+    const h = e.target.value === "" ? NaN : Number(e.target.value);
+    if (Number.isFinite(h) && h >= 0 && h <= 16) map[k] = h; else delete map[k];
+    store.studyDays = map;
+    renderPath();
+  });
+
+  // Botón flotante del ritmo: abre/cierra el detalle y salta a mi lección u objetivo.
+  $("plan-pill").addEventListener("click", () => {
+    const pop = $("plan-pop");
+    pop.classList.toggle("hidden");
+    $("plan-pill").setAttribute("aria-expanded", String(!pop.classList.contains("hidden")));
+  });
+  $("plan-pop").addEventListener("click", (e) => {
+    const go = e.target.closest("[data-go]")?.dataset.go;
+    if (!go) return;
+    const path = $("path");
+    const y = go === "target"
+      ? Number(path.dataset.targetY)
+      : (path.querySelector(".node--current")?.getBoundingClientRect().top ?? 0) - path.getBoundingClientRect().top + path.scrollTop;
+    path.scrollTo({ top: Math.max(0, y - path.clientHeight / 2), behavior: "smooth" });
+    $("plan-pop").classList.add("hidden");
+    $("plan-pill").setAttribute("aria-expanded", "false");
+  });
+  window.addEventListener("resize", () => { if ($("screen-path").classList.contains("active")) refreshPlan(); });
 
   $("reset-progress").addEventListener("click", () => {
     if (!window.confirm("¿Reiniciar todo el progreso (camino, racha y XP)? No se puede deshacer.")) return;

@@ -34,3 +34,16 @@ describe("computePlan", () => {
     expect(b).toBeGreaterThan(a);
   });
 });
+
+describe("hoursPerDay como función (horas distintas por día)", () => {
+  const hours = (d) => (d.getDate() === 1 ? 0 : 6); // 1/10 sin hueco, el resto 6 h
+  it("un día con 0 h no suma", () => {
+    expect(studyHoursBetween(at(2026, 10, 1, 0), at(2026, 10, 2, 0), hours)).toBe(0);
+    expect(studyHoursBetween(at(2026, 9, 30, 0), at(2026, 10, 1, 0), hours)).toBeCloseTo(6, 6);
+  });
+  it("computePlan acepta la función y da un perDay finito", () => {
+    const p = computePlan({ total: 158, done: 28, baseDone: 28, startMs: at(2026, 9, 29, 12, 12), nowMs: at(2026, 9, 29, 12, 12), examDate: "2026-10-03", hoursPerDay: hours });
+    expect(Number.isFinite(p.perDay)).toBe(true);
+    expect(p.hoursLeft).toBeGreaterThan(0);
+  });
+});

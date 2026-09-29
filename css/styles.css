@@ -499,13 +499,18 @@ button { font-family: inherit; cursor: pointer; }
 .qcard__actions { display: flex; gap: 8px; margin-top: 6px; }
 
 /* Ritmo hasta el examen */
-.plan-card { margin: 0 16px 8px 26px; padding: 12px 14px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface); font-size: 14px; font-weight: 700; }
-.plan-card__head { display: flex; justify-content: space-between; font-size: 16px; margin-bottom: 4px; }
-.plan-card--ok { border-color: var(--green); }
-.plan-card--warn { border-color: #ff9600; }
-.plan-card--bad { border-color: var(--red); }
-.plan-card__pace { color: var(--muted); font-size: 13px; }
 .rail { position: absolute; left: 8px; width: 8px; border-radius: 999px; background: var(--border); z-index: 2; pointer-events: none; }
 .rail__fill { position: absolute; top: 0; left: 0; right: 0; border-radius: 999px; background: var(--green); }
 .rail__target { position: absolute; left: -5px; width: 18px; height: 0; border-top: 3px solid var(--red); }
 .rail__target span { position: absolute; left: 22px; top: -9px; font-size: 10px; font-weight: 800; color: #fff; background: var(--red); border-radius: 6px; padding: 1px 6px; }
+.plan-float { position: relative; height: 0; z-index: 20; }
+.plan-pill { position: absolute; top: 8px; right: 12px; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-weight: 800; font-size: 14px; border-radius: 999px; padding: 8px 14px; min-height: 40px; box-shadow: 0 3px 10px rgba(0,0,0,.18); }
+.plan-pill--ok { border-color: var(--green); }
+.plan-pill--warn { border-color: #ff9600; }
+.plan-pill--bad { border-color: var(--red); }
+.plan-pop { position: absolute; top: 56px; right: 12px; width: min(320px, calc(100vw - 24px)); background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); padding: 12px 14px; box-shadow: 0 6px 18px rgba(0,0,0,.22); font-size: 14px; font-weight: 700; display: flex; flex-direction: column; gap: 6px; }
+.plan-pop.hidden { display: none; }
+.plan-pop__muted { color: var(--muted); font-size: 13px; }
+.plan-pop .btn { min-height: 40px; }
+.study-day { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; font-weight: 800; }
+.study-day input { width: 84px; font-family: inherit; font-weight: 800; padding: 8px; border-radius: 12px; border: 2px solid var(--border); background: var(--surface); color: var(--text); min-height: 40px; }

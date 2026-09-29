@@ -37,6 +37,10 @@
       <span class="stat stat--hearts"><span class="stat__icon" aria-hidden="true">❤️</span><span id="hearts-top">5</span><span class="sr-only">vidas</span></span>
     </div>
   </header>
+  <div class="plan-float">
+    <button type="button" class="plan-pill" id="plan-pill" aria-expanded="false" aria-controls="plan-pop">…</button>
+    <div class="plan-pop hidden" id="plan-pop"></div>
+  </div>
   <main class="path container" id="path"></main>
 </section>
 
@@ -195,8 +199,13 @@
         <input type="date" id="exam-date" style="font-family:inherit;font-weight:800;padding:10px;border-radius:12px;border:2px solid var(--border);background:var(--surface);color:var(--text);min-height:44px">
       </div>
       <div class="row">
-        <div><div class="row__label">Horas de estudio al día</div><div class="row__hint">Solo las libres de verdad: calcula tu ritmo objetivo</div></div>
+        <div><div class="row__label">Horas de estudio al día</div><div class="row__hint">Por defecto; abajo puedes ajustar cada día</div></div>
         <input type="number" id="study-hours" min="1" max="16" step="0.5" style="width:84px;font-family:inherit;font-weight:800;padding:10px;border-radius:12px;border:2px solid var(--border);background:var(--surface);color:var(--text);min-height:44px">
+      </div>
+      <div class="row" style="display:block">
+        <div class="row__label">Horas por día hasta el examen</div>
+        <div class="row__hint">Vacío = usa las de arriba. Pon 0 en un día sin hueco.</div>
+        <div id="study-days"></div>
       </div>
       <div class="row">
         <div><div class="row__label">Origen de las preguntas</div><div class="row__hint">Mismo filtro que en Práctica libre</div></div>
