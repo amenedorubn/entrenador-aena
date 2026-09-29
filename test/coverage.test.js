@@ -44,3 +44,27 @@ describe("cobertura de reales", () => {
     expect(first).toEqual(["v10", "v11", "v6", "v7", "v8", "v9"]);
   });
 });
+
+describe("última lección de unidad: solo reales", () => {
+  it("devuelve n oficiales sin repetir, priorizando las no vistas de la unidad", async () => {
+    const { buildRealsOnlyLesson } = await import("../js/content.js");
+    const bank = [
+      ...Array.from({ length: 8 }, (_, i) => q(`an${i}`, { category: "analogias" })),      // verbal (unidad)
+      ...Array.from({ length: 8 }, (_, i) => q(`nu${i}`, { category: "razonamiento_numerico" })), // num (otra)
+    ];
+    loadReal(bank);
+    setSeenIds(["an0", "an1"]); // 2 de la unidad ya vistas
+    const items = buildRealsOnlyLesson(["verbal"], 3, 10);
+    const ids = items.map((i) => i.id);
+    expect(new Set(ids).size).toBe(10);
+    expect(items.every((i) => i.origen === "oficial")).toBe(true);
+    // las 6 no vistas de la unidad entran todas; ninguna vista de fuera de la unidad
+    for (const id of ["an2", "an3", "an4", "an5", "an6", "an7"]) expect(ids).toContain(id);
+    expect(ids.some((id) => id === "an0" || id === "an1")).toBe(false);
+  });
+  it("si el banco no da para n devuelve las que haya", async () => {
+    const { buildRealsOnlyLesson } = await import("../js/content.js");
+    loadReal([q("solo1"), q("solo2")]);
+    expect(buildRealsOnlyLesson(["verbal"], 3, 10)).toHaveLength(2);
+  });
+});

@@ -2,7 +2,7 @@ import {
   WORLDS, LESSONS, PASS_THRESHOLD, QUESTIONS_PER_LESSON, HEARTS,
   isPassed, lessonState, currentLessonIndex, unitProgress, worldProgress, worldUnlocked, totalPassed,
 } from "./curriculum.js";
-import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES, setSeenIds, realCoverage, buildUnseenLesson } from "./content.js";
+import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES, setSeenIds, realCoverage, buildUnseenLesson, buildRealsOnlyLesson } from "./content.js";
 import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speakItem, stopSpeech, optionText, transcriptText } from "./engine.js";
 import { LEVELS as LISTEN_LEVELS, LEVEL_LABEL as LISTEN_LEVEL_LABEL } from "../data/listening.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
@@ -155,6 +155,7 @@ function paintPlanPill(plan, done) {
     <div>Deberías ir por la lección <b>${Math.round(plan.expected)}</b> ahora mismo; vas por la ${done}.</div>
     <div class="plan-pop__muted">${pace}</div>
     ${coverageHtml(plan, done)}
+    ${dailyTargetsHtml()}
     <button type="button" class="btn btn--green btn--wide" data-go="current">Ir a mi lección</button>
     <button type="button" class="btn btn--ghost btn--wide" data-go="target">Ir al objetivo</button>`;
 }
@@ -216,6 +217,28 @@ function coverageHtml(plan, done) {
     ${cov.unseen ? '<button type="button" class="btn btn--ghost btn--wide" data-go="unseen">Ver reales pendientes</button>' : ""}`;
 }
 
+// Objetivos al cierre de cada ventana de estudio que queda: lecciones y reales vistas que
+// deberías llevar para llegar al 100 % de ambas el viernes a las 20:00.
+function dailyTargetsHtml() {
+  const now = Date.now();
+  const cov = realCoverage();
+  const DIAS_L = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  const rows = [];
+  for (const k of Object.keys(STUDY_WINDOWS).sort()) {
+    const [y, m, d] = k.split("-").map(Number);
+    const end = new Date(y, m - 1, d, 0, 0, 0).getTime() + STUDY_WINDOWS[k][1] * 36e5;
+    if (end <= now) continue;
+    const common = { startMs: PLAN_START_MS, nowMs: end, examDate: store.examDate, hoursPerDay: hoursForDay, windowFor: windowForDay };
+    const les = computePlan({ ...common, total: LESSONS.length, done: 0, baseDone: PLAN_BASE_DONE });
+    const rea = computePlan({ ...common, total: cov.total, done: 0, baseDone: 0 });
+    const hh = String(Math.floor(STUDY_WINDOWS[k][1])).padStart(2, "0");
+    const mm = STUDY_WINDOWS[k][1] % 1 ? "30" : "00";
+    rows.push(`<div class="plan-pop__row"><span>${DIAS_L[new Date(y, m - 1, d).getDay()]} ${hh}:${mm}</span><b>${Math.min(LESSONS.length, Math.ceil(les.expected))}/${LESSONS.length} · ${Math.min(cov.total, Math.ceil(rea.expected))}/${cov.total} reales</b></div>`);
+  }
+  if (!rows.length) return "";
+  return `<div class="plan-pop__sep"></div><div class="plan-pop__muted">Objetivo al cerrar cada día (lecciones · reales):</div>${rows.join("")}`;
+}
+
 /* ============================== camino ============================== */
 function renderPath() {
   const progress = store.progress;
@@ -242,7 +265,7 @@ function renderPath() {
           <div>
             <div class="unit-banner__eyebrow">Mundo ${wi + 1} · Unidad ${ui + 1}</div>
             <div class="unit-banner__title">${u.title}</div>
-            <div class="unit-banner__sub">${u.subtitle}</div>
+            <div class="unit-banner__sub">${u.subtitle} · última lección: solo reales</div>
           </div>
           <div class="unit-banner__trophy" aria-label="${up.complete ? "Unidad completada" : `${up.done} de ${up.total} lecciones`}">${up.complete ? "🏆" : `${up.done}/${up.total}`}</div>
         </div>
@@ -298,8 +321,14 @@ function startLesson(index) {
   session.lessonIndex = index;
   session.practice = null;
   session.review = false; session.unseen = false;
-  session.items = buildLesson(l.sources, l.tier, QUESTIONS_PER_LESSON, { origenFilter: store.origenFilter });
-  beginSession(`Mundo ${l.worldIndex + 1} · Unidad ${l.unitIndex + 1} · Lección ${l.lessonIndex + 1}`);
+  const isUnitFinal = l.lessonIndex === l.lessonsInUnit - 1;
+  // La última lección de cada unidad es solo de preguntas reales (ignora el filtro de origen).
+  const realsOnly = isUnitFinal ? buildRealsOnlyLesson(l.sources, l.tier, QUESTIONS_PER_LESSON) : [];
+  session.items = realsOnly.length >= QUESTIONS_PER_LESSON
+    ? realsOnly
+    : buildLesson(l.sources, l.tier, QUESTIONS_PER_LESSON, { origenFilter: store.origenFilter });
+  const tag = realsOnly.length >= QUESTIONS_PER_LESSON ? " · solo reales" : "";
+  beginSession(`Mundo ${l.worldIndex + 1} · Unidad ${l.unitIndex + 1} · Lección ${l.lessonIndex + 1}${tag}`);
 }
 
 function startPractice(source, tier) {

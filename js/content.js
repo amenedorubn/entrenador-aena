@@ -106,6 +106,37 @@ export function realCoverage() {
   return { seen, total: pool.length, unseen: pool.length - seen };
 }
 
+/**
+ * Lección de SOLO preguntas reales oficiales (la última de cada unidad). Prioridad:
+ * 1) no vistas de las categorías de la unidad, 2) no vistas de cualquier otra categoría
+ * (para no quedarse corta si la unidad tiene poco banco real), 3) ya vistas de la unidad.
+ * Dentro de cada grupo, nivel cercano al tier primero. Nunca repite id. Si el banco no da
+ * para n, devuelve las que haya (el llamador decide si complementa).
+ */
+export function buildRealsOnlyLesson(sources, tier, n = 10) {
+  const cats = new Set(sources.flatMap((src) => SOURCE_CATEGORIES[src] ?? []));
+  const groups = [[], [], []];
+  for (const q of REAL.filter(servibleOficial)) {
+    const inUnit = cats.has(q.category);
+    const seen = seenIds.has(q.id);
+    if (!seen && inUnit) groups[0].push(q);
+    else if (!seen) groups[1].push(q);
+    else if (inUnit) groups[2].push(q);
+  }
+  const ordered = groups.flatMap((g) => {
+    const near = shuffle(g.filter((q) => Math.abs((q.lvl ?? 3) - tier) <= 1));
+    const rest = shuffle(g.filter((q) => Math.abs((q.lvl ?? 3) - tier) > 1));
+    return [...near, ...rest];
+  });
+  const items = [];
+  for (const q of ordered) {
+    if (items.length >= n) break;
+    const it = toRealItem(q, CATEGORY_SOURCE[q.category], tier);
+    if (it) items.push(it);
+  }
+  return shuffle(items);
+}
+
 /** Sesión de hasta n preguntas oficiales aún no vistas (de cualquier categoría, orden barajado). */
 export function buildUnseenLesson(n = 10) {
   const pool = shuffle(REAL.filter((q) => servibleOficial(q) && !seenIds.has(q.id)));
