@@ -10,7 +10,8 @@ import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/compete
 import { loadReal, REAL } from "../data/real.js";
 import { choice, shuffle } from "./rng.js";
 import { APP_VERSION } from "./version.js";
-import { computePlan, feasibility } from "./plan.js";
+import { computePlan, feasibility, studyHoursBetween, examMs } from "./plan.js";
+import * as stats from "./stats.js";
 
 /* ============================== almacenamiento ============================== */
 const K = "aena2_";
@@ -70,12 +71,16 @@ const store = {
   // Minutos por pregunta de las últimas sesiones: calibra cuánto tardas de verdad.
   get qMins() { return get("qMins", []); },
   set qMins(v) { set("qMins", v); },
+  // Registro de cada respuesta (hora, tiempo, acierto, fuente...) para la pestaña Stats.
+  // Formato y tope en js/stats.js.
+  get answerLog() { return get("answerLog", []); },
+  set answerLog(v) { set("answerLog", v); },
 };
 
 /* ============================== utilidades DOM ============================== */
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["path", "practice", "speaking", "profile", "settings", "quality", "lesson", "results", "competencias"];
-const NAV_SCREENS = new Set(["path", "practice", "speaking", "profile", "settings"]);
+const SCREENS = ["path", "practice", "speaking", "profile", "stats", "settings", "quality", "lesson", "results", "competencias"];
+const NAV_SCREENS = new Set(["path", "practice", "speaking", "profile", "stats", "settings"]);
 
 function show(name) {
   SCREENS.forEach((s) => $(`screen-${s}`).classList.toggle("active", s === name));
@@ -318,7 +323,7 @@ const session = {
   items: [], i: 0, correct: 0, hearts: HEARTS,
   lessonIndex: null, practice: null, review: false, unseen: false, selection: null, answered: false, startedAt: 0,
   // Resultado de la pregunta en curso y cuántas se han perdonado por reportarlas (ver excuseWrong).
-  verdict: null, excused: 0,
+  verdict: null, excused: 0, itemStart: 0,
 };
 
 function startLesson(index) {
@@ -404,6 +409,7 @@ function renderCurrentItem() {
   session.items[session.i] = item;
   session.selection = null;
   session.answered = false;
+  session.itemStart = Date.now();
 
   $("lesson-progress").style.width = `${(session.i / session.items.length) * 100}%`;
   $("hearts-count").textContent = session.hearts;
@@ -443,6 +449,7 @@ function evaluate() {
     markOptions(answerEl, item.correctIndex, session.selection);
   }
 
+  logAnswer(item, good);
   const heartLost = !good && session.hearts !== Infinity && session.hearts > 0;
   session.verdict = { good, heartLost, excused: false };
   if (good) session.correct++;
@@ -526,6 +533,15 @@ function currentImageBroken(item) {
   return !img || (img.complete && img.naturalWidth === 0);
 }
 
+function logAnswer(item, good) {
+  const now = Date.now();
+  const ms = Math.min(stats.MAX_MS, Math.max(0, now - (session.itemStart || now)));
+  store.answerLog = stats.pushEntry(store.answerLog, {
+    t: now, ms, ok: good ? 1 : 0,
+    src: item.source ?? item.block ?? "otro", cat: item.family ?? "", r: item.isReal ? 1 : 0, s: session.startedAt,
+  });
+}
+
 // Una pregunta reportada (clave dudosa, imagen rota...) no cuenta como fallo: se quita de
 // "Repasar fallos", se devuelve la vida perdida y no entra en el % de la lección.
 function excuseWrong(item) {
@@ -533,6 +549,8 @@ function excuseWrong(item) {
   if (!v || v.good || v.excused || session.items[session.i] !== item) return;
   v.excused = true;
   session.excused++;
+  const log = store.answerLog;
+  if (log.length) { log[log.length - 1].x = 1; store.answerLog = log; }
   store.missedIds = store.missedIds.filter((id) => id !== item.id);
   if (v.heartLost) {
     session.hearts++;
@@ -676,6 +694,132 @@ function renderProfile() {
       <div class="progress-item__bar"><div class="progress-item__fill" style="width:${pct}%;background:${w.color}"></div></div>
     </div>`;
   }).join("");
+}
+
+/* ============================== estadísticas ============================== */
+const CAT_LABEL = {
+  sinonimos_antonimos: "Sinónimos/antónimos", analogias: "Analogías", secuencia_num_letras: "Secuencias núm./letras",
+  razonamiento_numerico: "Razonamiento numérico", series_numeros: "Series de números", matrices: "Matrices",
+  series_figuras: "Series de figuras", cubos: "Cubos", domino: "Dominó", relojes: "Relojes",
+  figuras_no_relacionadas: "Figuras no relacionadas", ingles_b1: "Inglés B1", ingles_b2: "Inglés B2",
+  competencias_conductuales: "Conductuales",
+};
+const fmtS = (s) => (s >= 90 ? `${Math.floor(s / 60)} min ${String(Math.round(s % 60)).padStart(2, "0")} s` : `${Math.round(s)} s`);
+const fmtPct = (x) => (x == null ? "—" : `${Math.round(x * 100)} %`);
+const fmtH = (h) => { const m = Math.round(Math.abs(h) * 60); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min` : `${m} min`; };
+const DAY_NAMES = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
+function statBars(rows, { value, text, color = "var(--blue)" }) {
+  const max = Math.max(1, ...rows.map(value));
+  return rows.map((r) => `<div class="progress-item">
+    <div class="progress-item__head"><span>${r.label}</span><span>${text(r)}</span></div>
+    <div class="progress-item__bar"><div class="progress-item__fill" style="width:${Math.round((value(r) / max) * 100)}%;background:${color}"></div></div>
+  </div>`).join("");
+}
+const statBox = (icon, val, lbl) => `<div class="stat-box"><span aria-hidden="true">${icon}</span><div><div class="stat-box__val">${val}</div><div class="stat-box__lbl">${lbl}</div></div></div>`;
+
+function renderStats() {
+  const now = Date.now();
+  const all = store.answerLog;
+  const root = $("stats-body");
+  if (!all.length) {
+    root.innerHTML = `<div class="card"><p class="note">Aún no hay datos. Haz una lección o una práctica y aquí verás cuántas haces, a qué velocidad y cuánto te falta.</p></div>`;
+    return;
+  }
+  const sm = stats.summary(all, now);
+  const cards = [];
+
+  cards.push(`<div class="card"><div class="card__title">Resumen</div><div class="stat-grid">
+    ${statBox("🧮", sm.total, "Preguntas respondidas")}
+    ${statBox("🎯", fmtPct(sm.acc), "Acierto global")}
+    ${statBox("⏱️", fmtS(sm.medS), "Mediana por pregunta")}
+    ${statBox("📅", sm.today, "Hoy")}
+    ${statBox("🗓️", sm.last7, "Últimos 7 días")}
+    ${statBox("⚡", `${fmtS(sm.fastS)} / ${fmtS(sm.slowS)}`, "Más rápida / más lenta")}
+  </div></div>`);
+
+  // Estimación: lo que queda de camino + reales sin ver, a tu ritmo real.
+  const remainingLessons = LESSONS.length - totalPassed(store.progress);
+  const cov = realCoverage();
+  const examAt = examMs(store.examDate);
+  const availableH = examAt > now ? studyHoursBetween(now, examAt, hoursForDay, windowForDay) : 0;
+  const pace = stats.estimate(all, 0, null);
+  if (pace) {
+    const rows = [
+      { label: `Lo que queda del camino (${remainingLessons} lecciones)`, q: remainingLessons * QUESTIONS_PER_LESSON },
+      { label: `Reales que aún no has visto (${cov.unseen})`, q: cov.unseen },
+    ].map((r) => ({ ...r, est: stats.estimate(all, r.q, null) }));
+    const both = stats.estimate(all, rows[0].q + rows[1].q, availableH);
+    const enough = both.slackHours >= 0;
+    cards.push(`<div class="card"><div class="card__title">Estimación a tu ritmo</div>
+      <div class="stat-grid">
+        ${statBox("🐢", fmtS(pace.sPerQ), "Por pregunta (con explicaciones)")}
+        ${statBox("🚀", Math.round(pace.qPerHour), "Preguntas por hora")}
+      </div>
+      <div class="progress-list" style="margin-top:12px">
+        ${rows.map((r) => `<div class="progress-item"><div class="progress-item__head"><span>${r.label}</span><span>≈ ${fmtH(r.est.hours)}</span></div></div>`).join("")}
+        <div class="progress-item"><div class="progress-item__head"><span><b>Total</b></span><span><b>≈ ${fmtH(both.hours)}</b></span></div></div>
+      </div>
+      <p class="note" style="margin-top:10px">Hasta el examen te quedan ~${fmtH(availableH)} de estudio según tu calendario: ${enough ? `sobran ~${fmtH(both.slackHours)}` : `faltan ~${fmtH(both.slackHours)}`}. Usa ${fmtS(pace.sPerQ)} por pregunta, lo medido en tus últimas sesiones.</p></div>`);
+  }
+
+  const b = stats.speedBuckets(all);
+  const trend = stats.speedTrend(all);
+  const trendText = !trend
+    ? "Con 20 preguntas o más verás si vas ganando velocidad."
+    : (() => {
+      const d = Math.round(trend.delta);
+      return `Tendencia: tu mediana pasó de ${fmtS(trend.from)} a ${fmtS(trend.to)} ${d === 0 ? "(igual)" : d < 0 ? `(${-d} s más rápido)` : `(${d} s más lento)`}.`;
+    })();
+  cards.push(`<div class="card"><div class="card__title">Rápidas y lentas</div>
+    <div class="progress-list">${statBars([
+      { label: `Rápidas (menos de ${stats.FAST_S} s)`, n: b.fast },
+      { label: `Normales (${stats.FAST_S}–${stats.SLOW_S} s)`, n: b.mid },
+      { label: `Lentas (más de ${stats.SLOW_S} s)`, n: b.slow },
+    ], { value: (r) => r.n, text: (r) => `${r.n} · ${Math.round((r.n / sm.total) * 100)} %`, color: "var(--green)" })}</div>
+    <p class="note" style="margin-top:10px">${trendText}</p></div>`);
+
+  const days = stats.byDay(all, now, 7).map((d) => ({ ...d, label: `${DAY_NAMES[d.day.getDay()]} ${d.day.getDate()}` }));
+  cards.push(`<div class="card"><div class="card__title">Por día (últimos 7)</div><div class="progress-list">${statBars(days, {
+    value: (r) => r.n, text: (r) => (r.n ? `${r.n} preg · ${fmtPct(r.acc)} · ${fmtS(r.medS)}` : "—"),
+  })}</div></div>`);
+
+  const ses = stats.sessions(all, 10);
+  const avgN = Math.round(ses.reduce((t, x) => t + x.n, 0) / ses.length);
+  cards.push(`<div class="card"><div class="card__title">Cada vez que entras</div>
+    <p class="note">Haces de media ${avgN} pregunta${avgN === 1 ? "" : "s"} por sesión (últimas ${ses.length}).</p>
+    <div class="progress-list" style="margin-top:10px">${statBars(ses.map((x) => ({
+      ...x, label: new Date(x.start).toLocaleString("es-ES", { weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+    })), {
+      value: (r) => r.n, text: (r) => `${r.n} preg · ${fmtH(r.wallS / 3600)} · ${Math.round(r.sPerQ)} s/preg · ${fmtPct(r.acc)}`,
+    })}</div></div>`);
+
+  const src = stats.bySource(all).map((r) => ({ ...r, label: SOURCE_LABELS[r.key] ?? r.key }));
+  cards.push(`<div class="card"><div class="card__title">Por bloque</div><div class="progress-list">${statBars(src, {
+    value: (r) => r.medS, text: (r) => `${fmtS(r.medS)} · ${fmtPct(r.acc)} · ${r.n}`,
+  })}</div><p class="note" style="margin-top:10px">La barra es la mediana de tiempo; después, acierto y nº de preguntas.</p></div>`);
+
+  const cat = stats.byCategory(all.filter((e) => e.r).map((e) => ({ ...e, cat: e.cat.replace(/^real-/, "") })), 3)
+    .map((r) => ({ ...r, label: CAT_LABEL[r.key] ?? r.key }));
+  if (cat.length) {
+    cards.push(`<div class="card"><div class="card__title">Preguntas reales por tipo</div>
+      <p class="note">De más lento a más rápido (mínimo 3 respondidas).</p>
+      <div class="progress-list" style="margin-top:10px">${statBars(cat, {
+        value: (r) => r.medS, text: (r) => `${fmtS(r.medS)} · ${fmtPct(r.acc)} · ${r.n}`,
+      })}</div></div>`);
+  }
+
+  const o = stats.byOrigin(all);
+  const parts = stats.byDaypart(all).map((r) => ({ ...r, label: r.key }));
+  cards.push(`<div class="card"><div class="card__title">Reales vs generadas</div><div class="stat-grid">
+    ${statBox("📄", o.real.n, `Reales · ${fmtPct(o.real.acc)} · ${o.real.n ? fmtS(o.real.medS) : "—"}`)}
+    ${statBox("⚙️", o.gen.n, `Generadas · ${fmtPct(o.gen.acc)} · ${o.gen.n ? fmtS(o.gen.medS) : "—"}`)}
+  </div></div>
+  <div class="card"><div class="card__title">Franja del día</div><div class="progress-list">${statBars(parts, {
+    value: (r) => r.n, text: (r) => `${r.n} · ${fmtPct(r.acc)} · ${fmtS(r.medS)}`,
+  })}</div></div>`);
+
+  root.innerHTML = cards.join("");
 }
 
 /* ============================== speaking ============================== */
@@ -856,6 +1000,7 @@ function goto(name) {
   if (name === "path") renderPath();
   if (name === "practice") renderPractice();
   if (name === "profile") renderProfile();
+  if (name === "stats") renderStats();
   if (name === "settings") renderSettings();
   if (name === "quality") renderQuality();
   if (name === "speaking") { newPrompt(); resetSpeak(); }
