@@ -148,3 +148,16 @@ describe("Léxico · integridad de los distractores", () => {
     }
   });
 });
+
+import { NOTES } from "../data/english-notes.js";
+import { GRAMMAR as G2 } from "../data/english.js";
+describe("NOTES (explicaciones largas de inglés)", () => {
+  it("todo id de NOTES existe en GRAMMAR o TRANSLATE", () => {
+    const ids = new Set([...G2.map((g) => g.id), ...TRANSLATE.map((t) => t.id)]);
+    for (const id of Object.keys(NOTES)) expect(ids.has(id), id).toBe(true);
+  });
+  it("todas las frases de nivel 3+ de GRAMMAR y todas las de TRANSLATE tienen explicación larga", () => {
+    for (const g of G2.filter((x) => x.lvl >= 2)) expect(NOTES[g.id], g.id).toBeTruthy();
+    for (const t of TRANSLATE) expect(NOTES[t.id], t.id).toBeTruthy();
+  });
+});

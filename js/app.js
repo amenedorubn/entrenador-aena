@@ -487,7 +487,16 @@ function evaluate() {
     const correctLabel = item.kind === "wordbank"
       ? item.answer.join(" ")
       : optionText(item.options[item.correctIndex]) || `la marcada como correcta arriba (opción ${"ABCDEF"[item.correctIndex]})`;
+    const mine = item.kind === "wordbank"
+      ? (Array.isArray(session.selection) ? session.selection.join(" ") : "")
+      : optionText(item.options[session.selection]);
     sol.textContent = `Respuesta correcta: ${correctLabel}`;
+    if (mine) {
+      const yours = document.createElement("span");
+      yours.className = "feedback__yours";
+      yours.textContent = `Tu respuesta: ${mine}`;
+      sol.append(document.createElement("br"), yours);
+    }
   } else {
     sol.classList.add("hidden");
   }

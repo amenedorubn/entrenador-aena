@@ -9,6 +9,7 @@
 // procedimiento con esa calidad sin un modelo de lenguaje -- así que es banco curado,
 // como GRAMMAR/ERROR_CORRECTION.
 import { GRAMMAR, TRANSLATE, ERROR_CORRECTION } from "../data/english.js";
+import { NOTES } from "../data/english-notes.js";
 import { LISTENING } from "../data/listening.js";
 import { choice, shuffle, shuffleBankOptions, ShuffleIntegrityError } from "./rng.js";
 
@@ -30,7 +31,7 @@ function shuffledBankItem(it, kind, block, tier) {
     prompt: it.prompt, audio: it.audio,
     options, correctIndex,
     value: it.options[it.correctIndex],
-    explanation: it.explanation, origen: it.origen, origenId: it.origenId ?? null,
+    explanation: NOTES[it.id] ?? it.explanation, origen: it.origen, origenId: it.origenId ?? null,
   };
 }
 
@@ -63,7 +64,7 @@ export function translateItem(tier = 3) {
     prompt: `Traduce al inglés: <b>${t.es}</b>`,
     tokens, answer: t.answer, alts: t.alts ?? [],
     value: t.answer.join(" "),
-    explanation: `Respuesta: <b>${t.answer.join(" ")}</b>.`,
+    explanation: NOTES[t.id] ?? "", // la respuesta ya sale como «Respuesta correcta»: aquí va la regla
     origen: t.origen, origenId: t.origenId ?? null,
   };
 }

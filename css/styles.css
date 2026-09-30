@@ -522,3 +522,5 @@ button { font-family: inherit; cursor: pointer; }
 .chart { display: grid; gap: 6px; }
 .chart svg { width: 100%; height: auto; display: block; }
 .chart__read { font-size: 13px; font-weight: 800; color: var(--text-strong); min-height: 18px; }
+
+.feedback__yours { font-size: 14px; font-weight: 700; opacity: .85; }

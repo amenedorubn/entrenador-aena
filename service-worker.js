@@ -1,6 +1,6 @@
 // Service worker — cachea el shell estático para uso offline básico.
 // Sube CACHE_VERSION cuando cambies archivos precacheados para forzar la actualización.
-const CACHE_VERSION = "v27";
+const CACHE_VERSION = "v28";
 const CACHE_NAME = `aena-${CACHE_VERSION}`;
 // Las imágenes de examen (MB cada una) van a una caché que NO se borra al subir de versión:
 // así no se vuelven a descargar en cada actualización y, una vez vistas, cargan sin red.
@@ -27,6 +27,7 @@ const PRECACHE_URLS = [
   "./js/gen-english.js",
   "./data/lexicon.js",
   "./data/english.js",
+  "./data/english-notes.js",
   "./data/sjt.js",
   "./data/real.js",
   "./data/real.enc.json",
