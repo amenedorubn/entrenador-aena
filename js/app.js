@@ -317,6 +317,8 @@ function renderPath() {
 const session = {
   items: [], i: 0, correct: 0, hearts: HEARTS,
   lessonIndex: null, practice: null, review: false, unseen: false, selection: null, answered: false, startedAt: 0,
+  // Resultado de la pregunta en curso y cuántas se han perdonado por reportarlas (ver excuseWrong).
+  verdict: null, excused: 0,
 };
 
 function startLesson(index) {
@@ -374,7 +376,7 @@ function startReview() {
 }
 
 function beginSession(kicker) {
-  session.i = 0; session.correct = 0; session.startedAt = Date.now();
+  session.i = 0; session.correct = 0; session.excused = 0; session.verdict = null; session.startedAt = Date.now();
   session.hearts = store.heartsOn && session.practice === null && !session.review ? HEARTS : Infinity;
   $("lesson-kicker").textContent = kicker;
   $("lesson-hearts").classList.toggle("hidden", session.hearts === Infinity);
@@ -441,6 +443,8 @@ function evaluate() {
     markOptions(answerEl, item.correctIndex, session.selection);
   }
 
+  const heartLost = !good && session.hearts !== Infinity && session.hearts > 0;
+  session.verdict = { good, heartLost, excused: false };
   if (good) session.correct++;
   else if (session.hearts !== Infinity) session.hearts = Math.max(0, session.hearts - 1);
   $("hearts-count").textContent = session.hearts;
@@ -455,6 +459,8 @@ function evaluate() {
     const idx = missed.indexOf(item.id);
     if (!good && idx === -1) { missed.push(item.id); store.missedIds = missed; }
     else if (good && idx !== -1) { missed.splice(idx, 1); store.missedIds = missed; }
+    // Una pregunta ya reportada antes no debe penalizar otra vez: el fallo puede ser del banco.
+    if (!good && store.reportedIds.some((r) => r.id === item.id)) excuseWrong(item);
   }
 
   const fb = $("feedback");
@@ -520,7 +526,24 @@ function currentImageBroken(item) {
   return !img || (img.complete && img.naturalWidth === 0);
 }
 
+// Una pregunta reportada (clave dudosa, imagen rota...) no cuenta como fallo: se quita de
+// "Repasar fallos", se devuelve la vida perdida y no entra en el % de la lección.
+function excuseWrong(item) {
+  const v = session.verdict;
+  if (!v || v.good || v.excused || session.items[session.i] !== item) return;
+  v.excused = true;
+  session.excused++;
+  store.missedIds = store.missedIds.filter((id) => id !== item.id);
+  if (v.heartLost) {
+    session.hearts++;
+    $("hearts-count").textContent = session.hearts;
+    const last = session.i === session.items.length - 1;
+    $("feedback-next").textContent = last ? "Ver resultado" : "Continuar";
+  }
+}
+
 function saveReport(item, motivo, { auto = false } = {}) {
+  excuseWrong(item);
   const list = store.reportedIds;
   const prev = list.find((r) => r.id === item.id);
   // Un reporte manual pisa a uno automático; uno automático nunca pisa a uno manual.
@@ -546,7 +569,8 @@ function nextItem() {
 function finish() {
   stopSpeech();
   const total = session.items.length;
-  const pct = Math.round((session.correct / total) * 100);
+  const graded = total - session.excused;
+  const pct = graded > 0 ? Math.round((session.correct / graded) * 100) : 100;
   const passed = pct >= PASS_THRESHOLD * 100;
   const ranOut = session.hearts === 0;
 
