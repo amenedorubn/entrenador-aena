@@ -56,6 +56,16 @@ describe("TRANSLATE (producción escrita)", () => {
     }
   });
 
+  it("cada orden alternativo es una permutación exacta de la respuesta", () => {
+    const key = (ws) => ws.map((w) => w.toLowerCase()).sort().join("|");
+    for (const t of TRANSLATE) {
+      for (const alt of t.alts ?? []) {
+        expect(key(alt), t.id).toBe(key(t.answer));
+        expect(alt.join(" ").toLowerCase(), t.id).not.toBe(t.answer.join(" ").toLowerCase());
+      }
+    }
+  });
+
   // Si un señuelo coincidiera con una ficha sobrante de la respuesta, podría existir
   // más de una construcción válida y la corrección sería ambigua.
   it("ningún señuelo permite una segunda respuesta con las mismas fichas", () => {

@@ -12,6 +12,7 @@ import { choice, shuffle } from "./rng.js";
 import { APP_VERSION } from "./version.js";
 import { computePlan, feasibility, studyHoursBetween, examMs } from "./plan.js";
 import * as stats from "./stats.js";
+import { lineChart, columnChart, bindCharts } from "./charts.js";
 
 /* ============================== almacenamiento ============================== */
 const K = "aena2_";
@@ -442,7 +443,9 @@ function evaluate() {
 
   let good;
   if (item.kind === "wordbank") {
-    good = Array.isArray(session.selection) && session.selection.join(" ") === item.answer.join(" ");
+    const norm = (w) => w.join(" ").toLowerCase();
+    good = Array.isArray(session.selection)
+      && [item.answer, ...(item.alts ?? [])].some((ans) => norm(ans) === norm(session.selection));
     lockWordbank(answerEl);
   } else {
     good = session.selection === item.correctIndex;
@@ -530,7 +533,9 @@ const MOTIVOS = {
 function currentImageBroken(item) {
   if (!item.image) return false;
   const img = $("lesson-question").querySelector("img");
-  return !img || (img.complete && img.naturalWidth === 0);
+  // Solo cuenta como rota si ya se reintentó la carga (un fallo de red suelto no es un fallo
+  // de la pregunta) y sigue sin píxeles.
+  return !img || (Boolean(img.dataset.retry) && img.complete && img.naturalWidth === 0);
 }
 
 function logAnswer(item, good) {
@@ -708,6 +713,8 @@ const fmtS = (s) => (s >= 90 ? `${Math.floor(s / 60)} min ${String(Math.round(s 
 const fmtPct = (x) => (x == null ? "—" : `${Math.round(x * 100)} %`);
 const fmtH = (h) => { const m = Math.round(Math.abs(h) * 60); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min` : `${m} min`; };
 const DAY_NAMES = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const bestRun = (es) => { let best = 0, run = 0; for (const e of es) { if (e.x) continue; run = e.ok ? run + 1 : 0; best = Math.max(best, run); } return best; };
+const fmtWhen = (t) => new Date(t).toLocaleString("es-ES", { weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 function statBars(rows, { value, text, color = "var(--blue)" }) {
   const max = Math.max(1, ...rows.map(value));
@@ -736,6 +743,8 @@ function renderStats() {
     ${statBox("📅", sm.today, "Hoy")}
     ${statBox("🗓️", sm.last7, "Últimos 7 días")}
     ${statBox("⚡", `${fmtS(sm.fastS)} / ${fmtS(sm.slowS)}`, "Más rápida / más lenta")}
+    ${statBox("🕒", fmtH(sm.activeS / 3600), "Tiempo respondiendo")}
+    ${statBox("🏅", bestRun(all), "Mejor racha de aciertos")}
   </div></div>`);
 
   // Estimación: lo que queda de camino + reales sin ver, a tu ritmo real.
@@ -744,6 +753,7 @@ function renderStats() {
   const examAt = examMs(store.examDate);
   const availableH = examAt > now ? studyHoursBetween(now, examAt, hoursForDay, windowForDay) : 0;
   const pace = stats.estimate(all, 0, null);
+  let needSPerQ = null;
   if (pace) {
     const rows = [
       { label: `Lo que queda del camino (${remainingLessons} lecciones)`, q: remainingLessons * QUESTIONS_PER_LESSON },
@@ -751,6 +761,7 @@ function renderStats() {
     ].map((r) => ({ ...r, est: stats.estimate(all, r.q, null) }));
     const both = stats.estimate(all, rows[0].q + rows[1].q, availableH);
     const enough = both.slackHours >= 0;
+    if (both.questions > 0 && availableH > 0) needSPerQ = (availableH * 3600) / both.questions;
     cards.push(`<div class="card"><div class="card__title">Estimación a tu ritmo</div>
       <div class="stat-grid">
         ${statBox("🐢", fmtS(pace.sPerQ), "Por pregunta (con explicaciones)")}
@@ -779,10 +790,43 @@ function renderStats() {
     ], { value: (r) => r.n, text: (r) => `${r.n} · ${Math.round((r.n / sm.total) * 100)} %`, color: "var(--green)" })}</div>
     <p class="note" style="margin-top:10px">${trendText}</p></div>`);
 
-  const days = stats.byDay(all, now, 7).map((d) => ({ ...d, label: `${DAY_NAMES[d.day.getDay()]} ${d.day.getDate()}` }));
-  cards.push(`<div class="card"><div class="card__title">Por día (últimos 7)</div><div class="progress-list">${statBars(days, {
-    value: (r) => r.n, text: (r) => (r.n ? `${r.n} preg · ${fmtPct(r.acc)} · ${fmtS(r.medS)}` : "—"),
-  })}</div></div>`);
+  // ---- curvas ----
+  const cum = stats.downsample(stats.cumulativeSeries(all), 120);
+  cards.push(`<div class="card"><div class="card__title">Curva de respondidas</div>
+    <p class="note">Preguntas acumuladas desde que empezaste a medir. Toca la gráfica para leer un punto.</p>
+    ${lineChart(cum.map((c) => ({ x: c.t, y: c.n, tip: `${c.n} preguntas · ${fmtWhen(c.t)}` })), {
+      title: "Preguntas respondidas acumuladas", yFmt: (v) => String(Math.round(v)),
+      xTicks: stats.dayTicks(cum[0].t, cum[cum.length - 1].t).map((t) => ({ x: t, label: `${DAY_NAMES[new Date(t).getDay()]} ${new Date(t).getDate()}` })),
+    })}</div>`);
+
+  const roll = stats.downsample(stats.rollingMedianS(all, 10), 120);
+  cards.push(`<div class="card"><div class="card__title">Tu velocidad de respuesta</div>
+    <p class="note">Mediana de las últimas 10 respuestas, en segundos. Bajar es ir más rápido.</p>
+    ${lineChart(roll.map((r) => ({ x: r.i, y: r.v, tip: `Respuesta ${r.i}: ${fmtS(r.v)} · ${fmtWhen(r.t)}` })), {
+      title: "Segundos por respuesta (mediana móvil)", yFmt: (v) => `${Math.round(v)} s`,
+    })}</div>`);
+
+  const sesAll = stats.sessions(all, 40).reverse();
+  if (sesAll.length >= 2) {
+    cards.push(`<div class="card"><div class="card__title">Ritmo real por sesión</div>
+      <p class="note">Segundos por pregunta contando explicaciones y pausas${needSPerQ ? `. La línea verde es lo que necesitas para acabar a tiempo (${fmtS(needSPerQ)})` : ""}.</p>
+      ${lineChart(sesAll.map((x, i) => ({ x: i, y: x.sPerQ, tip: `${fmtWhen(x.start)} · ${Math.round(x.sPerQ)} s/preg · ${x.n} preg` })), {
+        title: "Segundos por pregunta en cada sesión", area: false, yFmt: (v) => `${Math.round(v)} s`,
+        ref: needSPerQ ? { y: needSPerQ, label: `Objetivo ${Math.round(needSPerQ)} s` } : null,
+      })}</div>`);
+  }
+
+  const accRoll = stats.downsample(stats.rollingAcc(all.filter((e) => !e.x), 20), 120);
+  cards.push(`<div class="card"><div class="card__title">Curva de aciertos</div>
+    <p class="note">Porcentaje de acierto de las últimas 20 preguntas.</p>
+    ${lineChart(accRoll.map((r) => ({ x: r.i, y: r.v * 100, tip: `${Math.round(r.v * 100)} % · ${fmtWhen(r.t)}` })), {
+      title: "Acierto móvil", yMax: 100, yFmt: (v) => `${Math.round(v)} %`,
+    })}</div>`);
+
+  const days = stats.byDay(all, now, 7);
+  cards.push(`<div class="card"><div class="card__title">Preguntas por día</div>
+    ${columnChart(days.map((d) => ({ label: `${DAY_NAMES[d.day.getDay()]} ${d.day.getDate()}`, value: d.n,
+      tip: `${d.n} preg · ${fmtPct(d.acc)} · ${d.n ? fmtS(d.medS) : "—"}` })), { title: "Preguntas respondidas por día" })}</div>`);
 
   const ses = stats.sessions(all, 10);
   const avgN = Math.round(ses.reduce((t, x) => t + x.n, 0) / ses.length);
@@ -820,6 +864,7 @@ function renderStats() {
   })}</div></div>`);
 
   root.innerHTML = cards.join("");
+  bindCharts(root);
 }
 
 /* ============================== speaking ============================== */

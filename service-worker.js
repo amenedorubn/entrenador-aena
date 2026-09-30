@@ -1,7 +1,11 @@
 // Service worker — cachea el shell estático para uso offline básico.
 // Sube CACHE_VERSION cuando cambies archivos precacheados para forzar la actualización.
-const CACHE_VERSION = "v26";
+const CACHE_VERSION = "v27";
 const CACHE_NAME = `aena-${CACHE_VERSION}`;
+// Las imágenes de examen (MB cada una) van a una caché que NO se borra al subir de versión:
+// así no se vuelven a descargar en cada actualización y, una vez vistas, cargan sin red.
+const IMG_CACHE = "aena-img-v1";
+const isExamImage = (url) => url.pathname.includes("/public/assets/exams/");
 
 const PRECACHE_URLS = [
   "./",
@@ -16,6 +20,7 @@ const PRECACHE_URLS = [
   "./js/version.js",
   "./js/plan.js",
   "./js/stats.js",
+  "./js/charts.js",
   "./js/gen-numeric.js",
   "./js/gen-abstract.js",
   "./js/gen-verbal.js",
@@ -48,7 +53,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== IMG_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -59,6 +64,22 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+
+  if (isExamImage(url)) {
+    // Imagen de examen: caché persistente primero; si no está, red. Si la red falla se
+    // devuelve un error de red de verdad (nunca index.html: eso dejaba la <img> "rota"
+    // sin que el navegador pudiera reintentar).
+    event.respondWith(
+      caches.open(IMG_CACHE).then((cache) => cache.match(req).then((hit) => {
+        if (hit) return hit;
+        return fetch(req).then((res) => {
+          if (res && res.ok) cache.put(req, res.clone());
+          return res;
+        }).catch(() => Response.error());
+      }))
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(req).then((cached) => {
@@ -71,7 +92,7 @@ self.addEventListener("fetch", (event) => {
           }
           return res;
         })
-        .catch(() => caches.match("./index.html"));
+        .catch(() => (req.mode === "navigate" ? caches.match("./index.html") : Response.error()));
     })
   );
 });

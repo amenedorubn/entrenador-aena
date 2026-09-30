@@ -61,7 +61,7 @@ export function translateItem(tier = 3) {
   return {
     kind: "wordbank", block: "translate", tier, family: "translate",
     prompt: `Traduce al inglés: <b>${t.es}</b>`,
-    tokens, answer: t.answer,
+    tokens, answer: t.answer, alts: t.alts ?? [],
     value: t.answer.join(" "),
     explanation: `Respuesta: <b>${t.answer.join(" ")}</b>.`,
     origen: t.origen, origenId: t.origenId ?? null,

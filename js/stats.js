@@ -44,6 +44,7 @@ export function summary(es, now) {
     meanS: mean(secs),
     today: es.filter((e) => e.t >= day0).length,
     last7: es.filter((e) => e.t >= day0 - 6 * 86400000).length,
+    activeS: secs.reduce((t, x) => t + x, 0),
     fastS: secs.length ? Math.min(...secs) : 0,
     slowS: secs.length ? Math.max(...secs) : 0,
   };
@@ -131,7 +132,8 @@ export function speedTrend(es) {
  * cae a la mediana de respuesta más un margen fijo de lectura.
  */
 export function realPaceSPerQ(es) {
-  const ss = sessions(es, 8).filter((s) => s.n >= 3);
+  // Una sesión dejada abierta horas (sPerQ enorme) no es ritmo de estudio: se descarta.
+  const ss = sessions(es, 8).filter((s) => s.n >= 3 && s.sPerQ <= 240);
   if (ss.length) return ss.reduce((t, s) => t + s.wallS, 0) / ss.reduce((t, s) => t + s.n, 0);
   const recent = es.slice(-100);
   return recent.length ? median(recent.map((e) => e.ms / 1000)) + 10 : 0;
@@ -150,4 +152,41 @@ export function estimate(es, questions, availableHours = null) {
     availableHours,
     slackHours: availableHours == null ? null : availableHours - hours,
   };
+}
+
+/** Reduce una serie a como mucho `max` puntos (conserva siempre el primero y el último). */
+export function downsample(arr, max = 120) {
+  if (arr.length <= max) return arr;
+  const out = [];
+  for (let i = 0; i < max; i++) out.push(arr[Math.round((i * (arr.length - 1)) / (max - 1))]);
+  return out;
+}
+
+/** Respondidas acumuladas en el tiempo: [{ t, n }]. */
+export function cumulativeSeries(es) {
+  return es.map((e, i) => ({ t: e.t, n: i + 1 }));
+}
+
+/**
+ * Serie móvil sobre las últimas `win` respuestas: fn(ventana) -> valor. Devuelve
+ * [{ i, t, v }] (i = nº de respuesta, empezando en `win >> 1` para no dibujar ruido).
+ */
+export function rollingSeries(es, win, fn) {
+  const out = [];
+  for (let i = Math.min(win, es.length) - 1; i < es.length; i++) {
+    const w = es.slice(Math.max(0, i - win + 1), i + 1);
+    out.push({ i: i + 1, t: es[i].t, v: fn(w) });
+  }
+  return out;
+}
+export const rollingMedianS = (es, win = 10) => rollingSeries(es, win, (w) => median(w.map((e) => e.ms / 1000)));
+export const rollingAcc = (es, win = 20) => rollingSeries(es, win, (w) => accOf(w) ?? 0);
+
+/** Marcas de medianoche entre t0 y t1 (como mucho `max`, repartidas). */
+export function dayTicks(t0, t1, max = 5) {
+  const all = [];
+  for (let d = startOfDay(t0) + 86400000; d < t1; d += 86400000) all.push(d);
+  if (all.length <= max) return all;
+  const step = Math.ceil(all.length / max);
+  return all.filter((_, i) => i % step === 0);
 }

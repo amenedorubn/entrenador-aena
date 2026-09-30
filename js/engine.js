@@ -107,7 +107,7 @@ export function renderQuestion(item, el, onListen) {
       <div class="matrix">${item.cells.map((c) => `<div class="mcell">${c ? fig(c) : '<span class="qmark" aria-label="incógnita">?</span>'}</div>`).join("")}</div>`;
   } else if (item.kind === "figure-real") {
     el.innerHTML = `${badge}<p class="question">${item.prompt}</p>
-      <div class="figreal"><img src="./public/assets/exams/${item.image}" alt="Figura del examen real" loading="lazy"></div>`;
+      <div class="figreal"><img src="./public/assets/exams/${item.image}" alt="Figura del examen real" onerror="if(!this.dataset.retry){this.dataset.retry='1';var u=this.src.split('?')[0];setTimeout(()=>{this.src=u+'?r='+Date.now();},600);}"></div>`;
   } else {
     el.innerHTML = `${badge}<p class="question">${item.prompt}</p>`;
   }

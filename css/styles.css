@@ -517,3 +517,8 @@ button { font-family: inherit; cursor: pointer; }
 .plan-pop__sep { border-top: 2px solid var(--border); margin: 4px 0; }
 .plan-pop__row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
 .plan-pop { max-height: calc(100vh - 140px); overflow-y: auto; }
+
+/* Gráficas de la pestaña Stats (js/charts.js) */
+.chart { display: grid; gap: 6px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart__read { font-size: 13px; font-weight: 800; color: var(--text-strong); min-height: 18px; }
