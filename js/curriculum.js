@@ -44,9 +44,7 @@ export const WORLDS = [
       U("w3u3", "Matrices 3×3", "Raven de una regla por fila y columna", ["abs"], 5),
       U("w3u4", "Probabilidad y combinatoria", "Casos favorables, permutaciones y grupos", ["num"], 4),
       U("w3u5", "Competencias II", "Situaciones con opciones más ambiguas", ["sjt"], 5),
-      // tierShift -1: sirve frases de nivel 1-3 en vez de 2-4 (las de inversión y estructuras raras
-      // salían demasiado y bloqueaban el camino; el examen pide B1-B2).
-      { ...U("w3u6", "English B2", "Gerundios, relativos, pasivas y writing", ["grammar", "translate", "error"], 5), tierShift: -1 },
+      U("w3u6", "English B2", "Inversión, gerundios, relativos y writing", ["grammar", "translate", "error"], 5),
       U("w3u7", "Listening B2", "Avisos largos con varias condiciones", ["listen"], 4),
       U("w3u8", "Repaso del mundo 3", "Simulacro por bloques", ["verbal", "num", "abs", "sjt", "grammar", "listen"], 3),
     ],
@@ -88,7 +86,7 @@ export function allLessons() {
       for (let li = 0; li < u.lessons; li++) {
         out.push({
           key: `${u.id}l${li + 1}`,
-          worldId: w.id, worldIndex: wi, worldName: w.name, tier: w.tier + (u.tierShift ?? 0), color: w.color,
+          worldId: w.id, worldIndex: wi, worldName: w.name, tier: w.tier, color: w.color,
           unitId: u.id, unitIndex: ui, unitTitle: u.title, unitSubtitle: u.subtitle,
           lessonIndex: li, lessonsInUnit: u.lessons, sources: u.sources,
         });
