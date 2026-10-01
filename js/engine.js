@@ -163,6 +163,27 @@ function renderListenQuestion(item, el, badge, onListen, onSkip) {
   if (!grouped || (item.groupPos === 0 && state.plays === 0)) play();
 }
 
+/**
+ * Página de un audio con varias preguntas a la vez (como en el examen): arriba el
+ * audio (Escuchar + reproducciones compartidas + saltar) y debajo TODAS sus preguntas con
+ * sus opciones visibles, para poder repasarlas mientras suena por si repite algo.
+ * `onChange(idx, opcion)` avisa de cada respuesta marcada. Devuelve los contenedores de
+ * opciones (uno por pregunta) para que quien llama pueda marcar acierto/fallo.
+ */
+export function renderListenGroup(items, questionEl, answerEl, onListen, onSkip, onChange) {
+  const head = {
+    ...items[0], groupSize: 1, groupPos: 0,
+    prompt: `Escucha el audio y contesta a las ${items.length} preguntas. Puedes verlas todas mientras suena.`,
+  };
+  renderListenQuestion(head, questionEl, BADGE_BY_ORIGEN[items[0].origen] ?? "", onListen, onSkip);
+  answerEl.className = "";
+  answerEl.innerHTML = items.map((it, i) =>
+    `<div class="listen-q" style="margin-top:18px"><p class="question" style="font-size:1.05rem">${i + 1}. ${it.prompt}</p><div data-gq="${i}"></div></div>`).join("");
+  const boxes = [...answerEl.querySelectorAll("[data-gq]")];
+  boxes.forEach((box, i) => renderOptions(items[i], box, (sel) => onChange(i, sel)));
+  return boxes;
+}
+
 const LEVEL_LABEL = { A: "Nivel A · B1 bajo", B: "Nivel B · B1", C: "Nivel C · B2", D: "Nivel D · B2 alto" };
 
 /* ------------------------------- respuestas ------------------------------- */

@@ -3,7 +3,7 @@ import {
   isPassed, lessonState, currentLessonIndex, unitProgress, worldProgress, worldUnlocked, totalPassed,
 } from "./curriculum.js";
 import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES, setSeenIds, realCoverage, buildUnseenLesson, buildRealsOnlyLesson } from "./content.js";
-import { renderQuestion, renderOptions, renderWordbank, markOptions, lockWordbank, speakItem, stopSpeech, optionText, transcriptText } from "./engine.js";
+import { renderQuestion, renderListenGroup, renderOptions, renderWordbank, markOptions, lockWordbank, speakItem, stopSpeech, optionText, transcriptText } from "./engine.js";
 import { LEVELS as LISTEN_LEVELS, LEVEL_LABEL as LISTEN_LEVEL_LABEL } from "../data/listening.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
 import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/competencias.js";
@@ -338,6 +338,8 @@ const session = {
   lessonIndex: null, practice: null, review: false, unseen: false, selection: null, answered: false, startedAt: 0,
   // Resultado de la pregunta en curso y cuántas se han perdonado por reportarlas (ver excuseWrong).
   verdict: null, excused: 0, itemStart: 0,
+  // Página con varias preguntas del mismo audio: nº de ítems que ocupa, contenedores de opciones y respuestas.
+  page: 1, groupBoxes: null, groupSel: [],
 };
 
 function startLesson(index) {
@@ -433,6 +435,18 @@ function renderCurrentItem() {
   check.disabled = true;
   check.textContent = "Comprobar";
 
+  session.page = 1; session.groupBoxes = null;
+  if (item.group && item.groupSize > 1) {
+    // Un audio con varias preguntas: todas en la misma página (ver renderListenGroup).
+    const page = session.items.slice(session.i, session.i + item.groupSize).filter((x) => x.group === item.group);
+    session.page = page.length;
+    session.groupSel = page.map(() => null);
+    session.groupBoxes = renderListenGroup(page, $("lesson-question"), $("lesson-answer"), speakItem, skipListening, (idx, sel) => {
+      session.groupSel[idx] = sel;
+      check.disabled = session.groupSel.some((v) => v === null);
+    });
+    return;
+  }
   renderQuestion(item, $("lesson-question"), speakItem, skipListening);
   const answerEl = $("lesson-answer");
   if (item.kind === "wordbank") {
@@ -468,9 +482,51 @@ function skipListening() {
   renderCurrentItem();
 }
 
+// Corrección de una página con varias preguntas sobre el mismo audio: se puntúa cada
+// pregunta por separado (acierto/fallo, vida, estadísticas) y se muestra un resumen.
+function evaluateGroup() {
+  const page = session.items.slice(session.i, session.i + session.page);
+  const results = page.map((it, i) => {
+    const good = session.groupSel[i] === it.correctIndex;
+    markOptions(session.groupBoxes[i], it.correctIndex, session.groupSel[i]);
+    logAnswer(it, good);
+    if (good) session.correct++;
+    else if (session.hearts !== Infinity) session.hearts = Math.max(0, session.hearts - 1);
+    return { it, good, mine: session.groupSel[i] };
+  });
+  $("hearts-count").textContent = session.hearts;
+  const nGood = results.filter((r) => r.good).length;
+  const allGood = nGood === results.length;
+  session.verdict = { good: allGood, heartLost: false, excused: false };
+
+  const fb = $("feedback");
+  fb.classList.add("show", allGood ? "good" : "bad");
+  $("feedback-icon").textContent = allGood ? "✓" : "✕";
+  $("feedback-head").textContent = allGood ? "¡Todas correctas!" : `${nGood} de ${results.length} correctas`;
+  const sol = $("feedback-solution");
+  sol.textContent = "";
+  const wrong = results.filter((r) => !r.good);
+  sol.classList.toggle("hidden", !wrong.length);
+  wrong.forEach((r) => {
+    const n = results.indexOf(r) + 1;
+    const line = document.createElement("span");
+    line.textContent = `Pregunta ${n} · correcta: ${optionText(r.it.options[r.it.correctIndex])} · tu respuesta: ${optionText(r.it.options[r.mine])}`;
+    sol.append(line, document.createElement("br"));
+  });
+  $("feedback-text").innerHTML = results.map((r, i) => `<b>${i + 1}.</b> ${r.it.explanation ?? ""}`).join("<br><br>")
+    + `<br><br><b>Transcripción:</b><br>${transcriptText(page[0])}`;
+  $("feedback-report").classList.add("hidden");
+  $("feedback-report-panel").classList.add("hidden");
+  $("check-foot").classList.add("hidden");
+  const isLast = session.i + session.page >= session.items.length;
+  $("feedback-next").textContent = session.hearts === 0 || isLast ? "Ver resultado" : "Continuar";
+  $("feedback-next").focus();
+}
+
 function evaluate() {
   if (session.answered) return;
   session.answered = true;
+  if (session.groupBoxes) return evaluateGroup();
   const item = session.items[session.i];
   const answerEl = $("lesson-answer");
 
@@ -624,13 +680,10 @@ function saveReport(item, motivo, { auto = false } = {}) {
 }
 
 function nextItem() {
-  const cur = session.items[session.i];
-  if (session.hearts === 0) { stopSpeech(); return finish(); }
-  session.i++;
-  if (session.i >= session.items.length) { stopSpeech(); return finish(); }
-  // Si la siguiente pregunta es del mismo audio no se corta: se puede seguir oyendo.
-  const next = session.items[session.i];
-  if (!(cur?.group && next?.group === cur.group)) stopSpeech();
+  stopSpeech();
+  if (session.hearts === 0) return finish();
+  session.i += session.page || 1;
+  if (session.i >= session.items.length) return finish();
   renderCurrentItem();
 }
 
