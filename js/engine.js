@@ -313,11 +313,14 @@ try { window.speechSynthesis?.getVoices?.(); window.speechSynthesis?.addEventLis
 
 function pickVoice(accentId) {
   const voices = window.speechSynthesis?.getVoices?.() ?? [];
+  // Las voces de red (localService:false, p. ej. las "Google" de Android) fallan con
+  // synthesis-failed si no hay datos descargados o conexión: se prefieren las locales.
+  const best = (pred) => voices.find((x) => pred(x) && x.localService) ?? voices.find(pred);
   for (const lang of (ACCENT_LANGS[accentId] ?? ["en-GB"])) {
-    const v = voices.find((x) => x.lang === lang);
+    const v = best((x) => x.lang === lang || x.lang?.replace("_", "-") === lang);
     if (v) return v;
   }
-  return voices.find((x) => x.lang?.startsWith("en")) ?? null;
+  return best((x) => x.lang?.toLowerCase().startsWith("en")) ?? null;
 }
 
 // Varias llamadas seguidas a speechSynthesis.speak() sin cancel() entre medias se
@@ -327,11 +330,13 @@ function pickVoice(accentId) {
 // que un cancel() y recogen con el GC las que nadie referencia: de ahí el retardo y
 // `live` (que además evita que el audio "no suene" sin avisar).
 const live = [];
-function queueTurn(text, accentId, rate, hooks, useVoice = true) {
+function queueTurn(text, accentId, rate, hooks, stage = 0) {
   const u = new SpeechSynthesisUtterance(text);
-  const voice = useVoice ? pickVoice(accentId) : null;
-  if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = (ACCENT_LANGS[accentId] ?? ["en-GB"])[0]; }
-  u.rate = rate;
+  // Escalones de reintento: 0 voz elegida · 1 solo idioma en-US a ritmo normal · 2 nada
+  // (voz y idioma por defecto del sistema: peor acento, pero suena).
+  const voice = stage === 0 ? pickVoice(accentId) : null;
+  if (voice) { u.voice = voice; u.lang = voice.lang; } else if (stage === 1) { u.lang = "en-US"; } else if (stage === 0) { u.lang = (ACCENT_LANGS[accentId] ?? ["en-GB"])[0]; }
+  u.rate = stage === 0 ? rate : 1;
   u.onstart = () => hooks?.onstart?.();
   u.onend = () => { const i = live.indexOf(u); if (i >= 0) live.splice(i, 1); };
   u.onerror = (e) => { const i = live.indexOf(u); if (i >= 0) live.splice(i, 1); if (e?.error !== "canceled" && e?.error !== "interrupted") hooks?.onerror?.(e); };
@@ -344,42 +349,43 @@ function queueTurn(text, accentId, rate, hooks, useVoice = true) {
  * `hooks.onstart` se llama cuando el audio empieza de verdad y `hooks.onfail(info)` si el
  * navegador no llega a reproducirlo (sin motor TTS, bloqueado o error); `info` describe
  * por qué (nº de voces y código de error) para poder diagnosticarlo en el móvil.
- * Si falla con una voz concreta (voz listada pero no instalada, típico en Android), se
- * reintenta una vez sin fijar voz, solo con el idioma, y se deja que el SO elija.
+ * Si falla (voz listada pero no instalada, típico en Android) se reintenta sin voz fija
+ * y, si sigue fallando, con la voz y el idioma por defecto del sistema.
  */
 export function speakItem(item, hooks = {}) {
   const synth = window.speechSynthesis;
   const nVoices = () => { try { return synth.getVoices().length; } catch (e) { return 0; } };
   if (!synth || typeof SpeechSynthesisUtterance === "undefined") { hooks.onfail?.("este navegador no tiene síntesis de voz"); return; }
+  const localVoices = () => { try { return synth.getVoices().filter((v) => v.localService).length; } catch (e) { return 0; } };
   const rate = RATE_BY_LEVEL[item.level] ?? 1;
   let started = false, finished = false, lastError = "";
   const fail = () => {
     if (finished) return;
     finished = true;
-    hooks.onfail?.(`voces: ${nVoices()}${lastError ? `, error: ${lastError}` : ", sin respuesta del motor"}`);
+    hooks.onfail?.(`voces: ${nVoices()} (${localVoices()} locales)${lastError ? `, error: ${lastError}` : ", sin respuesta del motor"}`);
   };
-  const run = (useVoice) => {
+  const run = (stage) => {
     let runDone = false;
     const onstart = () => { started = true; hooks.onstart?.(); };
     const onerror = (e) => {
       if (started || runDone) return;
       runDone = true;
       lastError = e?.error ?? "desconocido";
-      if (useVoice) { synth.cancel(); setTimeout(() => run(false), 150); } else fail();
+      if (stage < 2) { synth.cancel(); setTimeout(() => run(stage + 1), 150); } else fail();
     };
     try {
       synth.resume(); // Chrome a veces deja el motor en pausa tras un cancel()
       if (Array.isArray(item.turns) && item.turns.length) {
-        item.turns.forEach((t, i) => queueTurn(t.text, t.accent, rate, i === 0 ? { onstart, onerror } : { onerror }, useVoice));
+        item.turns.forEach((t, i) => queueTurn(t.text, t.accent, rate, i === 0 ? { onstart, onerror } : { onerror }, stage));
       } else {
-        queueTurn(item.audio, item.accent ?? "en-GB", rate, { onstart, onerror }, useVoice);
+        queueTurn(item.audio, item.accent ?? "en-GB", rate, { onstart, onerror }, stage);
       }
     } catch (e) { lastError = String(e?.name ?? e); fail(); return; }
     setTimeout(() => { if (!started && !runDone && !synth.speaking && !synth.pending) onerror({ error: "no-arranca" }); }, 2500);
   };
   try {
     synth.cancel();
-    setTimeout(() => run(true), 150);
+    setTimeout(() => run(0), 150);
   } catch (e) { lastError = String(e?.name ?? e); fail(); }
 }
 
