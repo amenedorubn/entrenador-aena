@@ -143,7 +143,12 @@ function renderListenQuestion(item, el, badge, onListen, onSkip) {
     paint();
     // Si el navegador no llega a reproducirlo, no se gasta la reproducción.
     onListen(item, {
-      onfail: () => { if (!btn.isConnected) return; plays = Math.max(0, plays - 1); failNote.hidden = false; paint(); },
+      onfail: (info) => {
+        if (!btn.isConnected) return;
+        plays = Math.max(0, plays - 1);
+        failNote.textContent = `No se ha podido reproducir el audio (${info ?? "sin datos"}). Prueba con Escuchar otra vez (revisa el volumen y el modo silencio) o salta la pregunta.`;
+        failNote.hidden = false; paint();
+      },
     });
   };
   btn.addEventListener("click", play);
@@ -322,9 +327,9 @@ function pickVoice(accentId) {
 // que un cancel() y recogen con el GC las que nadie referencia: de ahí el retardo y
 // `live` (que además evita que el audio "no suene" sin avisar).
 const live = [];
-function queueTurn(text, accentId, rate, hooks) {
+function queueTurn(text, accentId, rate, hooks, useVoice = true) {
   const u = new SpeechSynthesisUtterance(text);
-  const voice = pickVoice(accentId);
+  const voice = useVoice ? pickVoice(accentId) : null;
   if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = (ACCENT_LANGS[accentId] ?? ["en-GB"])[0]; }
   u.rate = rate;
   u.onstart = () => hooks?.onstart?.();
@@ -336,30 +341,46 @@ function queueTurn(text, accentId, rate, hooks) {
 
 /**
  * Reproduce un ítem de listening completo (monólogo o diálogo multivoz).
- * `hooks.onstart` se llama cuando el audio empieza de verdad y `hooks.onfail` si el
- * navegador no llega a reproducirlo (sin motor TTS, bloqueado o error).
+ * `hooks.onstart` se llama cuando el audio empieza de verdad y `hooks.onfail(info)` si el
+ * navegador no llega a reproducirlo (sin motor TTS, bloqueado o error); `info` describe
+ * por qué (nº de voces y código de error) para poder diagnosticarlo en el móvil.
+ * Si falla con una voz concreta (voz listada pero no instalada, típico en Android), se
+ * reintenta una vez sin fijar voz, solo con el idioma, y se deja que el SO elija.
  */
 export function speakItem(item, hooks = {}) {
-  try {
-    const synth = window.speechSynthesis;
-    if (!synth || typeof SpeechSynthesisUtterance === "undefined") { hooks.onfail?.(); return; }
-    synth.cancel();
-    let started = false;
+  const synth = window.speechSynthesis;
+  const nVoices = () => { try { return synth.getVoices().length; } catch (e) { return 0; } };
+  if (!synth || typeof SpeechSynthesisUtterance === "undefined") { hooks.onfail?.("este navegador no tiene síntesis de voz"); return; }
+  const rate = RATE_BY_LEVEL[item.level] ?? 1;
+  let started = false, finished = false, lastError = "";
+  const fail = () => {
+    if (finished) return;
+    finished = true;
+    hooks.onfail?.(`voces: ${nVoices()}${lastError ? `, error: ${lastError}` : ", sin respuesta del motor"}`);
+  };
+  const run = (useVoice) => {
+    let runDone = false;
     const onstart = () => { started = true; hooks.onstart?.(); };
-    const onerror = () => hooks.onfail?.();
-    const rate = RATE_BY_LEVEL[item.level] ?? 1;
-    setTimeout(() => {
-      try {
-        synth.resume(); // Chrome a veces deja el motor en pausa tras un cancel()
-        if (Array.isArray(item.turns) && item.turns.length) {
-          item.turns.forEach((t, i) => queueTurn(t.text, t.accent, rate, i === 0 ? { onstart, onerror } : { onerror }));
-        } else {
-          queueTurn(item.audio, item.accent ?? "en-GB", rate, { onstart, onerror });
-        }
-        setTimeout(() => { if (!started && !synth.speaking && !synth.pending) hooks.onfail?.(); }, 2500);
-      } catch (e) { hooks.onfail?.(); }
-    }, 150);
-  } catch (e) { hooks.onfail?.(); /* sin Web Speech el listening sigue siendo legible tras responder */ }
+    const onerror = (e) => {
+      if (started || runDone) return;
+      runDone = true;
+      lastError = e?.error ?? "desconocido";
+      if (useVoice) { synth.cancel(); setTimeout(() => run(false), 150); } else fail();
+    };
+    try {
+      synth.resume(); // Chrome a veces deja el motor en pausa tras un cancel()
+      if (Array.isArray(item.turns) && item.turns.length) {
+        item.turns.forEach((t, i) => queueTurn(t.text, t.accent, rate, i === 0 ? { onstart, onerror } : { onerror }, useVoice));
+      } else {
+        queueTurn(item.audio, item.accent ?? "en-GB", rate, { onstart, onerror }, useVoice);
+      }
+    } catch (e) { lastError = String(e?.name ?? e); fail(); return; }
+    setTimeout(() => { if (!started && !runDone && !synth.speaking && !synth.pending) onerror({ error: "no-arranca" }); }, 2500);
+  };
+  try {
+    synth.cancel();
+    setTimeout(() => run(true), 150);
+  } catch (e) { lastError = String(e?.name ?? e); fail(); }
 }
 
 /** Transcripción para mostrar tras responder (nunca antes, ver renderListenQuestion). */
