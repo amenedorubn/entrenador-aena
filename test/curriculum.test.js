@@ -82,3 +82,20 @@ describe("desbloqueo y progreso", () => {
     expect(totalPassed({})).toBe(0);
   });
 });
+
+import { LESSONS as _L, lessonState as _state, currentLessonIndex as _cur, worldProgress as _wp, WORLDS as _W } from "../js/curriculum.js";
+describe("saltar unidad de sonido", () => {
+  it("desbloquea lo siguiente sin dar crédito", () => {
+    const u = _W[0].units.find((x) => x.sources[0] === "listen");
+    const first = _L.findIndex((l) => l.unitId === u.id);
+    const prog = {};
+    for (let i = 0; i < first; i++) prog[_L[i].key] = 100;
+    const last = first + u.lessons - 1;
+    expect(_state(prog, last + 1)).toBe("locked");
+    prog[`skip:${u.id}`] = 1;
+    expect(_state(prog, last + 1)).toBe("current");
+    expect(_state(prog, first)).toBe("current"); // sigue disponible para hacerla después
+    expect(_cur(prog)).toBe(last + 1);
+    expect(_wp(prog, "w1").lessonsDone).toBe(first);
+  });
+});

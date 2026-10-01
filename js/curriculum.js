@@ -112,12 +112,18 @@ export function lessonState(progress, index) {
   const l = LESSONS[index];
   if (isPassed(progress, l.key)) return "done";
   if (index === 0) return "current";
-  return isPassed(progress, LESSONS[index - 1].key) ? "current" : "locked";
+  return isCleared(progress, LESSONS[index - 1]) ? "current" : "locked";
 }
+
+// Una unidad "saltada" (p. ej. las de Listening cuando no se puede escuchar) no da
+// crédito -sus lecciones siguen sin superar y se pueden hacer después-, pero deja de
+// bloquear el camino. La marca vive en el mismo mapa de progreso con clave "skip:<unidad>".
+export const isUnitSkipped = (progress, unitId) => Boolean(progress[`skip:${unitId}`]);
+const isCleared = (progress, lesson) => isPassed(progress, lesson.key) || isUnitSkipped(progress, lesson.unitId);
 
 /** Índice de la primera lección no superada (dónde está el usuario ahora). */
 export function currentLessonIndex(progress) {
-  const i = LESSONS.findIndex((l) => !isPassed(progress, l.key));
+  const i = LESSONS.findIndex((l) => !isCleared(progress, l));
   return i === -1 ? LESSONS.length - 1 : i;
 }
 
@@ -125,7 +131,7 @@ export function currentLessonIndex(progress) {
 export function unitProgress(progress, unitId) {
   const ls = LESSONS.filter((l) => l.unitId === unitId);
   const done = ls.filter((l) => isPassed(progress, l.key)).length;
-  return { done, total: ls.length, complete: done === ls.length };
+  return { done, total: ls.length, complete: done === ls.length, skipped: done < ls.length && isUnitSkipped(progress, unitId) };
 }
 
 /** Progreso de un mundo: unidades completadas y % global. */
@@ -133,9 +139,10 @@ export function worldProgress(progress, worldId) {
   const w = WORLDS.find((x) => x.id === worldId);
   const units = w.units.map((u) => unitProgress(progress, u.id));
   const done = units.filter((u) => u.complete).length;
+  const cleared = units.filter((u) => u.complete || u.skipped).length;
   const lessonsDone = units.reduce((a, u) => a + u.done, 0);
   const lessonsTotal = units.reduce((a, u) => a + u.total, 0);
-  return { unitsDone: done, unitsTotal: w.units.length, complete: done === w.units.length, lessonsDone, lessonsTotal };
+  return { unitsDone: done, unitsTotal: w.units.length, complete: cleared === w.units.length, lessonsDone, lessonsTotal };
 }
 
 /** Un mundo está desbloqueado si es el primero o el anterior está completo. */

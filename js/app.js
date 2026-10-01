@@ -270,11 +270,16 @@ function renderPath() {
 
     w.units.forEach((u, ui) => {
       const up = unitProgress(progress, u.id);
+      const isListenUnit = u.sources.length === 1 && u.sources[0] === "listen";
+      const skipped = up.skipped;
+      const skipBtn = isListenUnit && !up.complete
+        ? `<button type="button" class="btn btn--ghost" data-skip-unit="${u.id}" style="margin-top:8px;padding:6px 12px;min-height:0">${skipped ? "↩ Quitar salto (la unidad sigue pendiente)" : "⏭ Saltar unidad de sonido y volver luego"}</button>` : "";
       html += `<div class="unit-banner" style="background:${w.color}">
           <div>
             <div class="unit-banner__eyebrow">Mundo ${wi + 1} · Unidad ${ui + 1}</div>
             <div class="unit-banner__title">${u.title}</div>
             <div class="unit-banner__sub">${u.subtitle} · última lección: solo reales</div>
+            ${skipBtn}
           </div>
           <div class="unit-banner__trophy" aria-label="${up.complete ? "Unidad completada" : `${up.done} de ${up.total} lecciones`}">${up.complete ? "🏆" : `${up.done}/${up.total}`}</div>
         </div>
@@ -305,6 +310,14 @@ function renderPath() {
   container.innerHTML = html;
   container.querySelectorAll("[data-lesson]").forEach((b) =>
     b.addEventListener("click", () => startLesson(Number(b.dataset.lesson))));
+  container.querySelectorAll("[data-skip-unit]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const prog = store.progress;
+      const key = `skip:${b.dataset.skipUnit}`;
+      if (prog[key]) delete prog[key]; else prog[key] = 1;
+      store.progress = prog;
+      renderPath();
+    }));
   container.querySelectorAll("[data-trophy]").forEach((b) =>
     b.addEventListener("click", () => alert("¡Unidad completada! Sigue avanzando por el camino.")));
 
@@ -420,7 +433,7 @@ function renderCurrentItem() {
   check.disabled = true;
   check.textContent = "Comprobar";
 
-  renderQuestion(item, $("lesson-question"), speakItem);
+  renderQuestion(item, $("lesson-question"), speakItem, skipListening);
   const answerEl = $("lesson-answer");
   if (item.kind === "wordbank") {
     renderWordbank(item, answerEl, (words) => {
@@ -433,6 +446,22 @@ function renderCurrentItem() {
       check.disabled = i === null;
     });
   }
+}
+
+// "Ahora no puedo escuchar": la pregunta de sonido pasa al final de la sesión, para
+// responderla después. No cuenta como fallo ni como acierto; si es la última de la
+// sesión (ya solo quedan listenings) se avisa en vez de dejarla en bucle.
+function skipListening() {
+  if (session.answered) return;
+  const rest = session.items.slice(session.i + 1);
+  if (!rest.some((x) => x.kind !== "listen")) {
+    alert("Solo quedan preguntas de sonido. Cuando puedas escuchar, responde; si no, sal con la ✕ y vuelve más tarde (la lección no se pierde).");
+    return;
+  }
+  stopSpeech();
+  const [item] = session.items.splice(session.i, 1);
+  session.items.push(item);
+  renderCurrentItem();
 }
 
 function evaluate() {

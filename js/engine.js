@@ -96,9 +96,9 @@ const BADGE_BY_ORIGEN = {
   generada: `<span class="badge-generated" title="Escrita desde cero imitando el estilo del examen, no es del examen real">GENERADA · práctica</span>`,
 };
 
-export function renderQuestion(item, el, onListen) {
+export function renderQuestion(item, el, onListen, onSkip) {
   const badge = BADGE_BY_ORIGEN[item.origen] ?? "";
-  if (item.kind === "listen") return renderListenQuestion(item, el, badge, onListen);
+  if (item.kind === "listen") return renderListenQuestion(item, el, badge, onListen, onSkip);
   if (item.kind === "figure-series") {
     el.innerHTML = `${badge}<p class="question">¿Qué figura continúa la serie?</p>
       <div class="figrow">${item.seq.map((f) => `<div class="fig">${fig(f)}</div>`).join("")}<div class="qmark" aria-label="incógnita">?</div></div>`;
@@ -118,11 +118,13 @@ export function renderQuestion(item, el, onListen) {
 // (nunca "las veces que quieras": eso era lo que hacía trivial acertar sin escuchar).
 const MAX_LISTEN_PLAYS = 2;
 
-function renderListenQuestion(item, el, badge, onListen) {
+function renderListenQuestion(item, el, badge, onListen, onSkip) {
   const levelBadge = item.level ? `<span class="badge-generated" style="margin-left:6px">${LEVEL_LABEL[item.level] ?? `Nivel ${item.level}`}</span>` : "";
   el.innerHTML = `${badge}${levelBadge}<p class="question">${item.prompt}</p>
     <button type="button" class="btn btn--blue" id="listen-btn"><span aria-hidden="true">🔊</span> <span id="listen-btn-label">Escuchar</span></button>
-    <p class="note" id="listen-plays-note" style="margin-top:8px"></p>`;
+    <p class="note" id="listen-plays-note" style="margin-top:8px"></p>
+    <p class="note" id="listen-fail-note" style="margin-top:4px;color:var(--red,#ea2b2b)" hidden>No se ha podido reproducir el audio. Prueba con Escuchar otra vez (revisa el volumen y el modo silencio) o salta la pregunta.</p>
+    ${onSkip ? `<button type="button" class="btn btn--ghost" id="listen-skip" style="margin-top:8px">⏭ Ahora no puedo escuchar: saltar y volver luego</button>` : ""}`;
   const btn = el.querySelector("#listen-btn");
   const note = el.querySelector("#listen-plays-note");
   let plays = 0;
@@ -133,13 +135,19 @@ function renderListenQuestion(item, el, badge, onListen) {
       : `Sin reproducciones restantes: responde con lo que has escuchado.`;
     btn.disabled = left <= 0;
   };
+  const failNote = el.querySelector("#listen-fail-note");
   const play = () => {
     if (plays >= MAX_LISTEN_PLAYS) return;
     plays++;
+    failNote.hidden = true;
     paint();
-    onListen(item);
+    // Si el navegador no llega a reproducirlo, no se gasta la reproducción.
+    onListen(item, {
+      onfail: () => { if (!btn.isConnected) return; plays = Math.max(0, plays - 1); failNote.hidden = false; paint(); },
+    });
   };
   btn.addEventListener("click", play);
+  el.querySelector("#listen-skip")?.addEventListener("click", () => onSkip());
   paint();
   play(); // la primera reproducción es automática al mostrar la pregunta
 }
@@ -294,6 +302,10 @@ const ACCENT_LANGS = {
   "en-AU": ["en-AU", "en-GB"], "en-IN": ["en-IN", "en-GB"], "en-GB-SCT": ["en-GB"],
 };
 
+// Las voces se cargan de forma asíncrona (sobre todo en Chrome/Android): pedirlas al
+// arrancar evita que la primera pregunta de listening salga sin voz inglesa.
+try { window.speechSynthesis?.getVoices?.(); window.speechSynthesis?.addEventListener?.("voiceschanged", () => {}); } catch (e) { /* no-op */ }
+
 function pickVoice(accentId) {
   const voices = window.speechSynthesis?.getVoices?.() ?? [];
   for (const lang of (ACCENT_LANGS[accentId] ?? ["en-GB"])) {
@@ -306,25 +318,48 @@ function pickVoice(accentId) {
 // Varias llamadas seguidas a speechSynthesis.speak() sin cancel() entre medias se
 // encolan y se reproducen en orden -- así se simulan varias voces/turnos con un único
 // motor TTS, sin necesitar encadenar promesas por onend.
-function queueTurn(text, accentId, rate) {
+// Chrome/Android descartan en silencio las utterances que se encolan en el mismo tick
+// que un cancel() y recogen con el GC las que nadie referencia: de ahí el retardo y
+// `live` (que además evita que el audio "no suene" sin avisar).
+const live = [];
+function queueTurn(text, accentId, rate, hooks) {
   const u = new SpeechSynthesisUtterance(text);
   const voice = pickVoice(accentId);
   if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = (ACCENT_LANGS[accentId] ?? ["en-GB"])[0]; }
   u.rate = rate;
+  u.onstart = () => hooks?.onstart?.();
+  u.onend = () => { const i = live.indexOf(u); if (i >= 0) live.splice(i, 1); };
+  u.onerror = (e) => { const i = live.indexOf(u); if (i >= 0) live.splice(i, 1); if (e?.error !== "canceled" && e?.error !== "interrupted") hooks?.onerror?.(e); };
+  live.push(u);
   window.speechSynthesis.speak(u);
 }
 
-/** Reproduce un ítem de listening completo (monólogo o diálogo multivoz). */
-export function speakItem(item) {
+/**
+ * Reproduce un ítem de listening completo (monólogo o diálogo multivoz).
+ * `hooks.onstart` se llama cuando el audio empieza de verdad y `hooks.onfail` si el
+ * navegador no llega a reproducirlo (sin motor TTS, bloqueado o error).
+ */
+export function speakItem(item, hooks = {}) {
   try {
-    window.speechSynthesis.cancel();
+    const synth = window.speechSynthesis;
+    if (!synth || typeof SpeechSynthesisUtterance === "undefined") { hooks.onfail?.(); return; }
+    synth.cancel();
+    let started = false;
+    const onstart = () => { started = true; hooks.onstart?.(); };
+    const onerror = () => hooks.onfail?.();
     const rate = RATE_BY_LEVEL[item.level] ?? 1;
-    if (Array.isArray(item.turns) && item.turns.length) {
-      for (const t of item.turns) queueTurn(t.text, t.accent, rate);
-    } else {
-      queueTurn(item.audio, item.accent ?? "en-GB", rate);
-    }
-  } catch (e) { /* sin Web Speech el listening sigue siendo legible tras responder */ }
+    setTimeout(() => {
+      try {
+        synth.resume(); // Chrome a veces deja el motor en pausa tras un cancel()
+        if (Array.isArray(item.turns) && item.turns.length) {
+          item.turns.forEach((t, i) => queueTurn(t.text, t.accent, rate, i === 0 ? { onstart, onerror } : { onerror }));
+        } else {
+          queueTurn(item.audio, item.accent ?? "en-GB", rate, { onstart, onerror });
+        }
+        setTimeout(() => { if (!started && !synth.speaking && !synth.pending) hooks.onfail?.(); }, 2500);
+      } catch (e) { hooks.onfail?.(); }
+    }, 150);
+  } catch (e) { hooks.onfail?.(); /* sin Web Speech el listening sigue siendo legible tras responder */ }
 }
 
 /** Transcripción para mostrar tras responder (nunca antes, ver renderListenQuestion). */
@@ -336,5 +371,5 @@ export function transcriptText(item) {
 }
 
 export function stopSpeech() {
-  try { window.speechSynthesis.cancel(); } catch (e) { /* no-op */ }
+  try { live.length = 0; window.speechSynthesis.cancel(); } catch (e) { /* no-op */ }
 }
