@@ -278,7 +278,7 @@ function renderPath() {
           <div>
             <div class="unit-banner__eyebrow">Mundo ${wi + 1} · Unidad ${ui + 1}</div>
             <div class="unit-banner__title">${u.title}</div>
-            <div class="unit-banner__sub">${u.subtitle} · última lección: solo reales</div>
+            <div class="unit-banner__sub">${u.subtitle} · ${w.tier >= 5 ? "casi todo reales" : w.tier === 4 ? "mayoría de reales · última lección: solo reales" : "última lección: solo reales"}</div>
             ${skipBtn}
           </div>
           <div class="unit-banner__trophy" aria-label="${up.complete ? "Unidad completada" : `${up.done} de ${up.total} lecciones`}">${up.complete ? "🏆" : `${up.done}/${up.total}`}</div>

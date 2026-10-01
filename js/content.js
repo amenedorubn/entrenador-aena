@@ -18,6 +18,10 @@ for (const [cat, src] of Object.entries(CATEGORY_SOURCE)) {
 // sirva una pregunta REAL de examen en vez de una generada por procedimiento. Ambas
 // se mezclan sin distinguir origen en el orden de la lección (ver curriculum.js).
 const REAL_CHANCE = 0.35;
+// A más nivel, más reales (las generadas se complican más que las del examen): mundo 4
+// (tier 4) 80 %, mundo 5 (tier 5) siempre real mientras quede banco (la generada solo
+// rellena si el pool real de esa fuente se agota en la lección).
+const realChance = (tier) => (tier >= 5 ? 1 : tier === 4 ? 0.8 : REAL_CHANCE);
 
 /* ============================== anti-repetición ============================== */
 // Firma de un ítem, usada para no servir la misma pregunta dos veces dentro de una
@@ -199,7 +203,7 @@ function pickReal(source, tier, dedupe, origenFilter) {
   const cats = SOURCE_CATEGORIES[source];
   if (!cats || !cats.length) return null;
   const forcedReal = origenFilter === "oficial" || origenFilter === "variante";
-  if (!forcedReal && Math.random() >= REAL_CHANCE) return null;
+  if (!forcedReal && Math.random() >= realChance(tier)) return null;
 
   const queue = (dedupe.realQueues[source] ??= buildRealQueue(cats, tier, origenFilter));
   while (queue.length) {
