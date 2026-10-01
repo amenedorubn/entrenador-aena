@@ -2,7 +2,7 @@
 import { generateNumeric } from "./gen-numeric.js";
 import { generateAbstract } from "./gen-abstract.js";
 import { generateVerbal } from "./gen-verbal.js";
-import { grammarItem, translateItem, listeningItem, errorItem } from "./gen-english.js";
+import { grammarItem, translateItem, listeningItem, listeningGroup, errorItem } from "./gen-english.js";
 import { SJT } from "../data/sjt.js";
 import { REAL, FIGURE_CATEGORIES, CATEGORY_SOURCE } from "../data/real.js";
 import { choice, shuffle, shuffleBankOptions, ShuffleIntegrityError } from "./rng.js";
@@ -336,6 +336,16 @@ export function makeItem(source, tier, dedupe = newDedupeSession(), opts = {}) {
  * rellenar el hueco. Se baraja el orden final para que la lección no vaya por bloques.
  */
 export function buildLesson(sources, tier, n = 10, opts = {}) {
+  // Listening puro: cada audio trae 3 preguntas seguidas, así que la lección usa
+  // floor(n/3) audios (9 preguntas con n=10) en vez de un audio por pregunta. Solo con
+  // origen "todas"/"generada": el banco de listening es todo generado.
+  const filter = opts.origenFilter ?? "todas";
+  if (sources.length === 1 && sources[0] === "listen" && (filter === "todas" || filter === "generada")) {
+    const used = new Set();
+    const out = [];
+    for (let g = 0; g < Math.max(1, Math.floor(n / 3)); g++) out.push(...listeningGroup(tier, opts, used));
+    if (out.length) return out; // en orden: las preguntas de un audio van seguidas
+  }
   const dedupe = newDedupeSession();
   const out = [];
   for (let i = 0; i < n; i++) {

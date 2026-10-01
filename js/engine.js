@@ -120,32 +120,37 @@ const MAX_LISTEN_PLAYS = 2;
 
 function renderListenQuestion(item, el, badge, onListen, onSkip) {
   const levelBadge = item.level ? `<span class="badge-generated" style="margin-left:6px">${LEVEL_LABEL[item.level] ?? `Nivel ${item.level}`}</span>` : "";
-  el.innerHTML = `${badge}${levelBadge}<p class="question">${item.prompt}</p>
+  // Varias preguntas sobre el mismo audio: comparten el contador de reproducciones
+  // (`item.group`), y solo la primera lo reproduce sola; las demás lo retoman con el botón.
+  const grouped = Boolean(item.group) && item.groupSize > 1;
+  const state = item.group ?? { plays: 0 };
+  const groupBadge = grouped ? `<span class="badge-generated" style="margin-left:6px">Audio · pregunta ${item.groupPos + 1} de ${item.groupSize}</span>` : "";
+  el.innerHTML = `${badge}${levelBadge}${groupBadge}<p class="question">${item.prompt}</p>
     <button type="button" class="btn btn--blue" id="listen-btn"><span aria-hidden="true">🔊</span> <span id="listen-btn-label">Escuchar</span></button>
     <p class="note" id="listen-plays-note" style="margin-top:8px"></p>
     <p class="note" id="listen-fail-note" style="margin-top:4px;color:var(--red,#ea2b2b)" hidden>No se ha podido reproducir el audio. Prueba con Escuchar otra vez (revisa el volumen y el modo silencio) o salta la pregunta.</p>
     ${onSkip ? `<button type="button" class="btn btn--ghost" id="listen-skip" style="margin-top:8px">⏭ Ahora no puedo escuchar: saltar y volver luego</button>` : ""}`;
   const btn = el.querySelector("#listen-btn");
   const note = el.querySelector("#listen-plays-note");
-  let plays = 0;
   const paint = () => {
-    const left = MAX_LISTEN_PLAYS - plays;
+    const left = MAX_LISTEN_PLAYS - state.plays;
+    const shared = grouped ? " (el audio es el mismo para las preguntas de este grupo)" : "";
     note.textContent = left > 0
-      ? `Te quedan ${left} reproducción${left === 1 ? "" : "es"}.`
+      ? `Te quedan ${left} reproducción${left === 1 ? "" : "es"}${shared}.`
       : `Sin reproducciones restantes: responde con lo que has escuchado.`;
     btn.disabled = left <= 0;
   };
   const failNote = el.querySelector("#listen-fail-note");
   const play = () => {
-    if (plays >= MAX_LISTEN_PLAYS) return;
-    plays++;
+    if (state.plays >= MAX_LISTEN_PLAYS) return;
+    state.plays++;
     failNote.hidden = true;
     paint();
     // Si el navegador no llega a reproducirlo, no se gasta la reproducción.
     onListen(item, {
       onfail: (info) => {
         if (!btn.isConnected) return;
-        plays = Math.max(0, plays - 1);
+        state.plays = Math.max(0, state.plays - 1);
         failNote.textContent = `No se ha podido reproducir el audio (${info ?? "sin datos"}). Prueba con Escuchar otra vez (revisa el volumen y el modo silencio) o salta la pregunta.`;
         failNote.hidden = false; paint();
       },
@@ -154,7 +159,8 @@ function renderListenQuestion(item, el, badge, onListen, onSkip) {
   btn.addEventListener("click", play);
   el.querySelector("#listen-skip")?.addEventListener("click", () => onSkip());
   paint();
-  play(); // la primera reproducción es automática al mostrar la pregunta
+  // La primera reproducción es automática al mostrar la primera pregunta del audio.
+  if (!grouped || (item.groupPos === 0 && state.plays === 0)) play();
 }
 
 const LEVEL_LABEL = { A: "Nivel A · B1 bajo", B: "Nivel B · B1", C: "Nivel C · B2", D: "Nivel D · B2 alto" };

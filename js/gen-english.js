@@ -10,7 +10,7 @@
 // como GRAMMAR/ERROR_CORRECTION.
 import { GRAMMAR, TRANSLATE, ERROR_CORRECTION } from "../data/english.js";
 import { NOTES } from "../data/english-notes.js";
-import { LISTENING } from "../data/listening.js";
+import { LISTENING, questionsOf } from "../data/listening.js";
 import { choice, shuffle, shuffleBankOptions, ShuffleIntegrityError } from "./rng.js";
 
 const near = (arr, tier) => {
@@ -101,6 +101,40 @@ export function listeningItem(tier = 3, opts = {}) {
     }
   }
   throw new Error("listeningItem: no se pudo servir ningún ítem íntegro tras varios intentos.");
+}
+
+/**
+ * Un audio con varias preguntas seguidas (como en el examen real): devuelve los ítems de
+ * UN mismo audio, que comparten `group` ({ plays }) para que las reproducciones (máx. 2)
+ * cuenten para todo el grupo. `excludeIds` evita repetir audio dentro de una lección.
+ * Devuelve [] si no queda ningún audio servible.
+ */
+export function listeningGroup(tier = 3, opts = {}, excludeIds = new Set()) {
+  const base = opts.level ? LISTENING.filter((x) => x.level === opts.level) : near(LISTENING, tier);
+  const pool = (base.length ? base : LISTENING).filter((x) => !excludeIds.has(x.id));
+  for (let attempt = 0; attempt < 5 && pool.length; attempt++) {
+    const it = choice(pool);
+    try {
+      const qs = questionsOf(it);
+      const group = { id: it.id, plays: 0 };
+      const out = qs.map((q, i) => {
+        const { options, correctIndex } = shuffleBankOptions(q.options, q.correctIndex, q.correctText, q.id);
+        return {
+          kind: "listen", block: "listen", tier, family: it.id,
+          prompt: q.prompt, audio: it.audio, turns: it.turns, accent: it.accent,
+          level: it.level, speakers: it.speakers, questionType: q.questionType,
+          options, correctIndex, value: q.options[q.correctIndex],
+          explanation: q.explanation, origen: it.origen, origenId: it.origenId ?? null,
+          group, groupPos: i, groupSize: qs.length, source: "listen",
+        };
+      });
+      excludeIds.add(it.id);
+      return out;
+    } catch (e) {
+      if (!(e instanceof ShuffleIntegrityError)) throw e;
+    }
+  }
+  return [];
 }
 
 /* --------------------------- registro por tier --------------------------- */

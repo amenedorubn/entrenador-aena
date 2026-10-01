@@ -222,6 +222,94 @@ export const LISTENING = [
   },
 ];
 
+/* ------------------- preguntas extra por audio (3 por audio) -------------------
+ * Un mismo audio sirve 3 preguntas seguidas (como en el examen real): se escucha una vez
+ * (2 reproducciones en total para las 3) y se responde a todo. Así una lección de 9
+ * preguntas son 3 audios en vez de 9. Cada extra cumple las mismas reglas duras que la
+ * pregunta principal (sin solape literal de 3+ palabras de contenido con el transcript;
+ * distractores que se mencionan en el audio pero no responden). */
+const EXTRA = {
+  la1: [
+    { prompt: `What time does the bakery counter close today?`, options: ["5:00 pm", "6:00 pm", "4:00 pm", "8:00 pm"], correctIndex: 0, correctText: "5:00 pm", questionType: "number",
+      explanation: `«instead of six o'clock, the counter shuts at five today» → hoy cierra a las 17:00; las 18:00 son la hora habitual, mencionada como contraste.` },
+    { prompt: `What extra benefit do loyalty card members get today?`, options: ["Twice the usual points on baked goods", "Double points on fruit and vegetables", "A free reusable bag", "Half price on tinned soup"], correctIndex: 0, correctText: "Twice the usual points on baked goods", questionType: "detail",
+      explanation: `Puntos dobles en pan y bollería («double points on all bread and pastries»), no en fruta y verdura. La bolsa cuesta 20 céntimos y la sopa a mitad de precio es otra oferta.` },
+  ],
+  la2: [
+    { prompt: `Which part of the library is already closed this afternoon?`, options: ["The children's area", "The reference room", "The computer area", "The lost property desk"], correctIndex: 0, correctText: "The children's area", questionType: "detail",
+      explanation: `La sección infantil de la primera planta ya está cerrada; la sala de consulta sigue abierta hasta el cierre, los ordenadores están libres y objetos perdidos se atiende hasta cerrar.` },
+    { prompt: `Why are drivers asked to move their cars before six?`, options: ["The parking area will be shut", "The library is closing early", "Staff training starts", "Roadworks are about to begin"], correctIndex: 0, correctText: "The parking area will be shut", questionType: "inference",
+      explanation: `«the car park behind the building will be locked from six» → hay que sacar el coche antes. El cierre de la biblioteca es a las 6:30, no a las 6, y la formación es el motivo del cierre anticipado, no del aparcamiento.` },
+  ],
+  la3: [
+    { prompt: `How far is the temporary stop from the usual one?`, options: ["A couple of minutes on foot", "Ten minutes by bus", "Right outside Market Square", "Half a kilometre"], correctIndex: 0, correctText: "A couple of minutes on foot", questionType: "detail",
+      explanation: `La parada provisional está a «about two minutes' walk» de la habitual, delante de correos; no está en Market Square.` },
+    { prompt: `When is normal service expected to return?`, options: ["At the start of next week", "Later this week", "Tomorrow morning", "After a month"], correctIndex: 0, correctText: "At the start of next week", questionType: "detail",
+      explanation: `El desvío dura el resto de esta semana y el servicio normal vuelve «next Monday morning», es decir, a principios de la semana próxima.` },
+  ],
+  lb1: [
+    { prompt: `How much extra does a drink cost with the set menu now?`, options: ["1 euro", "2 euros", "Nothing, it's included", "5 euros"], correctIndex: 0, correctText: "1 euro", questionType: "number",
+      explanation: `Antes incluía una bebida, pero cambió el mes pasado: ahora es «an extra euro». «Nothing» era la situación anterior.` },
+    { prompt: `What will the staff do while the customers wait at the bar?`, options: ["Set the table for four people", "Seat them at a table for two", "Offer them the set lunch menu", "Take their order at the bar"], correctIndex: 0, correctText: "Set the table for four people", questionType: "inference",
+      explanation: `La mesa junto a la ventana solo está puesta para dos: en cinco minutos añadirán dos sillas más, o sea, la prepararán para cuatro.` },
+  ],
+  lb2: [
+    { prompt: `How full is the later screening?`, options: ["Mostly empty", "Almost sold out", "Completely full", "Half full"], correctIndex: 0, correctText: "Mostly empty", questionType: "inference",
+      explanation: `El pase de las 9:45 está «barely a third full» (casi vacío); el de las 7:00 es el que está casi agotado.` },
+    { prompt: `How much do the two tickets cost altogether?`, options: ["$22", "$9.45", "$7", "$11"], correctIndex: 0, correctText: "$22", questionType: "number",
+      explanation: `El empleado dice «twenty-two dollars» por las dos entradas. 9:45 y 7:00 son horas de los pases, no precios.` },
+  ],
+  lb3: [
+    { prompt: `What happened to City's winger?`, options: ["He was substituted because of an injury", "He was sent off", "He scored the equaliser", "He started on the bench"], correctIndex: 0, correctText: "He was substituted because of an injury", questionType: "detail",
+      explanation: `«City replaced their injured winger just before the break». El que empezó en el banquillo es el máximo goleador del equipo visitante.` },
+    { prompt: `What risk do City face in the second half?`, options: ["A player could be sent off after another booking", "They have no substitutes left", "Their top scorer is injured", "The match may be abandoned"], correctIndex: 0, correctText: "A player could be sent off after another booking", questionType: "inference",
+      explanation: `Dos jugadores de City ya tienen amarilla: «one more card for either of them and it's an early shower» = otra tarjeta y se van a la ducha. El máximo goleador en el banquillo es del equipo visitante.` },
+  ],
+  lc1: [
+    { prompt: `Why has the roof material changed?`, options: ["The original tiles are unavailable for weeks", "The client wanted a darker charcoal colour", "The new tiles are cheaper", "The council required a change"], correctIndex: 0, correctText: "The original tiles are unavailable for weeks", questionType: "detail",
+      explanation: `El proveedor dice que ese estilo está agotado seis semanas más. El cliente solo comenta que el carbón le gusta con el ladrillo, el precio es el mismo y el permiso del ayuntamiento ya estaba concedido.` },
+    { prompt: `On which day will the skip be delivered?`, options: ["The 16th", "The 14th", "The 17th", "The 18th"], correctIndex: 0, correctText: "The 16th", questionType: "number",
+      explanation: `El contenedor llega «on the sixteenth, a day before the concrete». El 14 era la fecha original de los cimientos y el 17 la nueva.` },
+  ],
+  lc2: [
+    { prompt: `How strong could the wind get on the coast overnight?`, options: ["Up to 70 km/h", "Up to 40 km/h", "Up to 30 km/h", "Up to 90 km/h"], correctIndex: 0, correctText: "Up to 70 km/h", questionType: "number",
+      explanation: `En la costa, rachas de hasta 70 km/h; el interior tendrá vientos más suaves, de 30 a 40 km/h.` },
+    { prompt: `What is the forecast for Sunday?`, options: ["Calmer with some sunshine", "Stormy with gale-force winds", "Heavy rain all day", "Snow in the north"], correctIndex: 0, correctText: "Calmer with some sunshine", questionType: "detail",
+      explanation: `El domingo será más tranquilo tras pasar el frente, con sol y alguna lluvia al norte. Los vendavales son de la noche del sábado.` },
+  ],
+  lc3: [
+    { prompt: `Where should the patient collect the prescription today?`, options: ["At the chemist's in the same building as the clinic", "At the pharmacy on Bridge Street", "At the front desk", "They will deliver it to his home"], correctIndex: 0, correctText: "At the chemist's in the same building as the clinic", questionType: "detail",
+      explanation: `La farmacia de Bridge Street tiene problemas de existencias esta semana; la enfermera recomienda la del propio centro de salud, a dos minutos.` },
+    { prompt: `How does the patient say he feels?`, options: ["Far better, with only the odd headache", "Worse than before", "Exactly the same", "He has no symptoms at all"], correctIndex: 0, correctText: "Far better, with only the odd headache", questionType: "detail",
+      explanation: `«Much better now... just the occasional headache»: mejor, pero con dolores de cabeza de vez en cuando.` },
+  ],
+  ld1: [
+    { prompt: `What happens if they drop below the minimum balance?`, options: ["Their rate goes down on its own", "They pay a withdrawal penalty", "The account is closed", "They lose the fixed option"], correctIndex: 0, correctText: "Their rate goes down on its own", questionType: "detail",
+      explanation: `«the rate drops back down automatically». No hay penalización por retirar dinero antes de tiempo ni bloqueo.` },
+    { prompt: `Which option does Client A prefer?`, options: ["The one with more certainty", "The one that could earn more", "Waiting before deciding anything", "Withdrawing early"], correctIndex: 0, correctText: "The one with more certainty", questionType: "inference",
+      explanation: `Client A dice «I'd rather have the certainty» y pide un presupuesto de la opción fija: prefiere la seguridad aunque la variable pudiera subir más.` },
+  ],
+  ld2: [
+    { prompt: `Which direction is traffic moving freely?`, options: ["Traffic heading south", "Traffic heading north", "Both directions", "Neither direction"], correctIndex: 0, correctText: "Traffic heading south", questionType: "detail",
+      explanation: `El sentido sur fluye con normalidad toda la mañana; el norte sigue cortado.` },
+    { prompt: `What does the reporter advise people who don't know the area?`, options: ["Use a phone to follow the diversion", "Rely on the road signs", "Wait until six o'clock", "Take the ring road anyway"], correctIndex: 0, correctText: "Use a phone to follow the diversion", questionType: "detail",
+      explanation: `La señalización del desvío por el puente no es buena, así que mejor seguirla con el móvil «rather than relying purely on the road signs».` },
+  ],
+  ld3: [
+    { prompt: `How long should the walk to the gate take?`, options: ["Around 8 minutes", "Around 35 minutes", "Around 15 minutes", "Around 22 minutes"], correctIndex: 0, correctText: "Around 8 minutes", questionType: "number",
+      explanation: `«maybe eight minutes on foot». Los 35 minutos son los que le quedan hasta la salida y los 10-15 el posible retraso del vuelo.` },
+    { prompt: `Where is the new boarding area?`, options: ["Away from security, next to the restaurants", "Near security, like it usually would be", "Beside gate 14", "Near the exit"], correctIndex: 0, correctText: "Away from security, next to the restaurants", questionType: "detail",
+      explanation: `El embarque es al fondo, cerca de la zona de restaurantes («food court»), no en la parte próxima a seguridad como suele ser.` },
+  ],
+};
+for (const it of LISTENING) it.extra = EXTRA[it.id] ?? [];
+
+/** Todas las preguntas de un audio: la principal más las extra, con la misma forma. */
+export function questionsOf(it) {
+  const main = { prompt: it.prompt, options: it.options, correctIndex: it.correctIndex, correctText: it.correctText, questionType: it.questionType, explanation: it.explanation };
+  return [main, ...(it.extra ?? [])].map((q, i) => ({ ...q, id: i === 0 ? it.id : `${it.id}-q${i + 1}` }));
+}
+
 /**
  * Duración estimada en segundos a partir del recuento de palabras del transcript y una
  * velocidad orientativa por nivel (medio del rango pedido: A/B ≈150 ppm, C/D ≈178 ppm).

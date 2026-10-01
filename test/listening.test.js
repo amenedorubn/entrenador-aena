@@ -85,3 +85,41 @@ describe("data/listening.js · reglas duras de la Tarea 3", () => {
     }
   });
 });
+
+import { questionsOf } from "../data/listening.js";
+import { buildLesson } from "../js/content.js";
+
+describe("data/listening.js · preguntas extra por audio", () => {
+  it("cada audio sirve 3 preguntas y todas pasan las reglas duras", () => {
+    const STOP = new Set(["a", "an", "the", "to", "of", "in", "on", "at", "is", "are", "was", "were", "and", "or", "but", "for", "with"]);
+    const words = (s) => s.toLowerCase().replace(/[^a-z0-9' ]/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w));
+    for (const it of LISTENING) {
+      const qs = questionsOf(it);
+      expect(qs, it.id).toHaveLength(3);
+      expect(new Set(qs.map((q) => q.prompt)).size, it.id).toBe(3);
+      for (const q of qs) {
+        expect(q.options, q.id).toHaveLength(4);
+        expect(new Set(q.options).size, q.id).toBe(4);
+        expect(q.options[q.correctIndex], q.id).toBe(q.correctText);
+        expect(literalOverlap(q.correctText, it.audio), `${q.id}: solape literal`).toBeNull();
+        expect(q.explanation?.length, q.id).toBeGreaterThan(20);
+        const tw = new Set(words(it.audio));
+        const scores = q.options.map((o) => words(o).filter((w) => tw.has(w)).length);
+        const top = Math.max(...scores);
+        const winners = scores.map((s, i) => (s === top ? i : -1)).filter((i) => i >= 0);
+        if (winners.length === 1) expect(winners[0], `${q.id}: gana por solape bruto`).not.toBe(q.correctIndex);
+      }
+    }
+  });
+
+  it("una lección de listening agrupa las preguntas por audio (3 audios × 3)", () => {
+    const items = buildLesson(["listen"], 3, 10);
+    expect(items).toHaveLength(9);
+    for (let g = 0; g < 3; g++) {
+      const trio = items.slice(g * 3, g * 3 + 3);
+      expect(new Set(trio.map((x) => x.group)).size).toBe(1);
+      expect(trio.map((x) => x.groupPos)).toEqual([0, 1, 2]);
+    }
+    expect(new Set(items.map((x) => x.family)).size).toBe(3); // audios distintos
+  });
+});

@@ -453,14 +453,18 @@ function renderCurrentItem() {
 // sesión (ya solo quedan listenings) se avisa en vez de dejarla en bucle.
 function skipListening() {
   if (session.answered) return;
-  const rest = session.items.slice(session.i + 1);
+  const cur = session.items[session.i];
+  const inGroup = (x) => x === cur || (cur.group && x.group === cur.group);
+  const rest = session.items.slice(session.i).filter((x) => !inGroup(x));
   if (!rest.some((x) => x.kind !== "listen")) {
     alert("Solo quedan preguntas de sonido. Cuando puedas escuchar, responde; si no, sal con la ✕ y vuelve más tarde (la lección no se pierde).");
     return;
   }
   stopSpeech();
-  const [item] = session.items.splice(session.i, 1);
-  session.items.push(item);
+  // Se salta el audio entero (todas sus preguntas pendientes) y vuelve al final.
+  const moved = session.items.filter((x, idx) => idx >= session.i && inGroup(x));
+  session.items = [...session.items.filter((x, idx) => idx < session.i || !inGroup(x)), ...moved];
+  moved.forEach((x) => { if (x.group) x.group.plays = 0; });
   renderCurrentItem();
 }
 
@@ -620,10 +624,13 @@ function saveReport(item, motivo, { auto = false } = {}) {
 }
 
 function nextItem() {
-  stopSpeech();
-  if (session.hearts === 0) return finish();
+  const cur = session.items[session.i];
+  if (session.hearts === 0) { stopSpeech(); return finish(); }
   session.i++;
-  if (session.i >= session.items.length) return finish();
+  if (session.i >= session.items.length) { stopSpeech(); return finish(); }
+  // Si la siguiente pregunta es del mismo audio no se corta: se puede seguir oyendo.
+  const next = session.items[session.i];
+  if (!(cur?.group && next?.group === cur.group)) stopSpeech();
   renderCurrentItem();
 }
 
