@@ -341,7 +341,7 @@ function renderPath() {
 /* ============================== sesión de lección ============================== */
 const session = {
   items: [], i: 0, correct: 0, hearts: HEARTS,
-  lessonIndex: null, practice: null, review: false, unseen: false, bank: null, wrong: 0, selection: null, answered: false, startedAt: 0,
+  lessonIndex: null, practice: null, review: false, unseen: false, bank: null, wrong: 0, failed: [], selection: null, answered: false, startedAt: 0,
   // Resultado de la pregunta en curso y cuántas se han perdonado por reportarlas (ver excuseWrong).
   verdict: null, excused: 0, itemStart: 0,
   // Página con varias preguntas del mismo audio: nº de ítems que ocupa, contenedores de opciones y respuestas.
@@ -420,7 +420,7 @@ function startEnglishBank() {
 }
 
 function beginSession(kicker) {
-  session.i = 0; session.correct = 0; session.wrong = 0; session.excused = 0; session.verdict = null; session.startedAt = Date.now();
+  session.i = 0; session.correct = 0; session.wrong = 0; session.failed = []; session.excused = 0; session.verdict = null; session.startedAt = Date.now();
   session.hearts = store.heartsOn && session.practice === null && !session.review ? HEARTS : Infinity;
   $("lesson-kicker").textContent = kicker;
   $("lesson-hearts").classList.toggle("hidden", session.hearts === Infinity);
@@ -441,6 +441,26 @@ function ensureRenderable(item) {
     candidate = makeItem(candidate.source, candidate.tier);
   }
   return candidate;
+}
+
+/** Por qué cada opción es buena o mala (preguntas con optionNotes); `mine` = índice elegido o null. */
+function optionNotesHtml(item, mine) {
+  const rows = item.options.map((o, i) => {
+    const tag = i === item.correctIndex ? "✅" : i === mine ? "❌ tu respuesta" : "✖";
+    return `<br><b>${"ABCD"[i]}) ${optionText(o)}</b> ${tag}<br>${item.optionNotes[i] ?? ""}`;
+  });
+  return `<br><br><b>Por qué:</b>${rows.join("<br>")}`;
+}
+
+/** Tarjetas desplegables con enunciado, tu respuesta, la correcta y la explicación completa. */
+function failCardsHtml(entries) {
+  if (!entries.length) return `<p class="note">No hay fallos que mostrar.</p>`;
+  return entries.map(({ item, mine }, i) => {
+    const prompt = String(item.prompt).replace("___", "_____");
+    const yours = mine != null ? `Tu respuesta: <b>${optionText(item.options[mine])}</b><br>` : "";
+    return `<details class="card" style="margin-bottom:10px"><summary><b>${i + 1}.</b> ${prompt}${item.tema ? ` <span class="note">· ${item.tema}</span>` : ""}</summary>
+      <p style="margin-top:8px">${yours}Correcta: <b>${optionText(item.options[item.correctIndex])}</b><br><br>${item.explanation ?? ""}${item.optionNotes ? optionNotesHtml(item, mine) : ""}</p></details>`;
+  }).join("");
 }
 
 // Examen de inglés (bancos de 50): cada fallo resta WRONG_PENALTY aciertos (el cuadernillo
@@ -583,7 +603,11 @@ function evaluate() {
   const heartLost = !good && session.hearts !== Infinity && session.hearts > 0;
   session.verdict = { good, heartLost, excused: false };
   if (good) session.correct++;
-  else { session.wrong++; if (session.hearts !== Infinity) session.hearts = Math.max(0, session.hearts - 1); }
+  else {
+    session.wrong++;
+    if (item.kind !== "wordbank" && session.selection !== null) session.failed.push({ item, mine: session.selection });
+    if (session.hearts !== Infinity) session.hearts = Math.max(0, session.hearts - 1);
+  }
   $("hearts-count").textContent = session.hearts;
   paintBankTally();
 
@@ -630,6 +654,7 @@ function evaluate() {
   }
 
   let text = item.explanation ?? "";
+  if (item.optionNotes) text += optionNotesHtml(item, session.selection);
   if (item.kind === "listen") text += `<br><br><b>Transcripción:</b><br>${transcriptText(item)}`;
   $("feedback-text").innerHTML = text;
 
@@ -775,6 +800,11 @@ function finish() {
       : passed
         ? (session.lessonIndex !== null ? "Has desbloqueado la siguiente lección." : "Buen trabajo. Sigue practicando.")
         : `Necesitas un ${PASS_THRESHOLD * 100} % para superar la lección. Repasa las explicaciones y repite.`;
+  const failsEl = $("results-fails");
+  failsEl.classList.toggle("hidden", !(session.bank && session.failed.length));
+  if (session.bank && session.failed.length) {
+    failsEl.innerHTML = `<div class="card__title">Tus fallos explicados (${session.failed.length})</div>${failCardsHtml(session.failed)}`;
+  }
   if (session.bank) {
     const net = session.correct - WRONG_PENALTY * session.wrong, need = total / 2;
     $("results-sub").textContent = `${session.correct} aciertos y ${session.wrong} fallos de ${total}. Nota: ${session.correct} − ${fmtNum(WRONG_PENALTY)}×${session.wrong} = ${fmtNum(net)} de ${total}. Hay que llegar a ${fmtNum(need)}: ${net >= need ? "APROBADO" : "NO llegas"}.`;
@@ -826,6 +856,7 @@ function renderEnglishBank() {
       ? (missed ? `${missed} fallo${missed === 1 ? "" : "s"} pendiente${missed === 1 ? "" : "s"} de ${total}.` : `Ningún fallo pendiente (${total} preguntas en el banco).`)
       : `${total} preguntas, ${missed} fallada${missed === 1 ? "" : "s"} pendiente${missed === 1 ? "" : "s"}.`;
   $("eng-start").disabled = n === 0;
+  $("eng-fails").classList.add("hidden");
 }
 
 /** Un mismo valor persistente (store.origenFilter), pintado en dos sitios (Práctica
@@ -1270,6 +1301,13 @@ function init() {
   document.querySelectorAll("#eng-mode button").forEach((b) =>
     b.addEventListener("click", () => { store.engMode = b.dataset.mode; renderEnglishBank(); }));
   $("eng-start").addEventListener("click", startEnglishBank);
+  $("eng-fails-btn").addEventListener("click", () => {
+    const box = $("eng-fails");
+    if (!box.classList.contains("hidden")) { box.classList.add("hidden"); return; }
+    const items = buildEnglishBankLesson(store.engBank, { onlyMissed: true, missedIds: store.missedIds });
+    box.innerHTML = failCardsHtml(items.map((item) => ({ item, mine: null })));
+    box.classList.remove("hidden");
+  });
   document.querySelectorAll("#practice-listen-level button").forEach((b) =>
     b.addEventListener("click", () => { store.listenLevel = b.dataset.level; renderPractice(); }));
   document.querySelectorAll("#practice-origen-filter button, #settings-origen-filter button").forEach((b) =>

@@ -189,7 +189,7 @@ function toRealItem(q, source, tier) {
     id: q.id, kind: isFigure ? "figure-real" : "text", block: source, source, tier, family: `real-${q.category}`,
     prompt: q.prompt, image: q.image ?? null, requiresAsset: Boolean(q.requiresAsset),
     options: q.options, correctIndex: q.correctIndex, value: q.options[q.correctIndex],
-    explanation,
+    explanation, optionNotes: q.optionNotes ?? null, tema: q.tema ?? null,
     isReal: true, confidence: q.confidence, sourceFile: q.sourceFile,
     // origen viene siempre "oficial" en REAL (ver Tarea 1); se propaga tal cual en vez
     // de fijarlo aquí para que el validador de data/real.source.js sea quien de verdad
