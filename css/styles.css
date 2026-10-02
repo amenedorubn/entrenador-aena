@@ -524,3 +524,33 @@ button { font-family: inherit; cursor: pointer; }
 .chart__read { font-size: 13px; font-weight: 800; color: var(--text-strong); min-height: 18px; }
 
 .feedback__yours { font-size: 14px; font-weight: 700; opacity: .85; }
+
+
+/* ------------------------------ Estudio (Inglés oficial) ------------------------------ */
+.study-title { font-size: 22px; margin: 6px 0 4px; }
+.study-tabs { margin-bottom: 10px; }
+.study-sub { display: block; font-weight: 500; font-size: 13px; opacity: .9; margin-top: 2px; }
+.study-list { display: grid; gap: 10px; margin-top: 14px; }
+.study-row { text-align: left; font: inherit; color: inherit; width: 100%; background: var(--bg); border: 2px solid var(--border); border-radius: 16px; padding: 14px; cursor: pointer; min-height: 64px; }
+.study-row:active { transform: scale(.99); }
+.study-row__head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 8px; font-size: 16px; }
+.study-weight { font-weight: 800; font-size: 18px; white-space: nowrap; }
+.study-weight small { font-weight: 500; color: var(--muted); font-size: 13px; }
+.study-rules { margin: 0; padding-left: 22px; font-size: 17px; line-height: 1.5; }
+.study-rules li { margin: 0 0 10px; }
+.study-solved { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--border); font-size: 15px; }
+.study-ok { color: var(--green-dark); }
+.study-blank { display: inline-block; min-width: 56px; border-bottom: 3px solid var(--blue); text-align: center; color: var(--blue); font-weight: 800; }
+.study-count { text-align: center; font-weight: 700; color: var(--muted); margin: 6px 0 4px; }
+.study-card { border: 2px solid var(--border); border-radius: 20px; padding: 20px 18px; margin: 14px 0; min-height: 220px; }
+.study-card__tag { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; margin-bottom: 12px; }
+.study-card__q { font-size: 22px; line-height: 1.4; font-weight: 700; margin-bottom: 14px; }
+.study-answer { font-size: 22px; font-weight: 800; margin: 6px 0 10px; }
+.study-rule { font-size: 16px; line-height: 1.5; margin: 0 0 10px; }
+.study-why summary { cursor: pointer; color: var(--blue); font-weight: 700; padding: 6px 0; }
+.study-why p { font-size: 15px; margin: 8px 0; }
+.study-grade { gap: 10px; }
+.study-grade .btn { min-height: 56px; font-size: 17px; }
+.study-end { text-align: center; padding: 24px 0; }
+.study-end__icon { font-size: 56px; }
+.study-cta { text-align: center; }

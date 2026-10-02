@@ -1,9 +1,9 @@
 // Guía de estudio de Inglés oficial. Las reglas y consejos son material genérico (van en
-// claro); las preguntas, sus respuestas y explicaciones salen del banco ya descifrado
-// (REAL), así que nada de texto de examen vive aquí. Se agrupa por el campo `tema` de
-// cada pregunta (ver data/real.source.js).
+// claro); las preguntas salen del banco ya descifrado (REAL), así que nada de texto de
+// examen vive aquí. Se agrupa por el campo `tema` de cada pregunta (ver data/real.source.js).
+// La pantalla que lo usa es js/study.js.
 
-const MACRO = {
+export const MACRO = {
   "Tiempos verbales": ["Tiempos verbales: present perfect", "Tiempos verbales: past simple", "Tiempos verbales: pasado", "Tiempos verbales: pasado continuo", "Tiempos verbales: presente simple", "Tiempos verbales: present perfect continuous", "Tiempos verbales: past perfect", "Futuro: planes", "Used to / hábitos pasados", "Verbos estáticos"],
   "Condicionales, wish y estilo indirecto": ["Condicionales y oraciones temporales", "Condicionales y wish", "Estilo indirecto"],
   "Voz pasiva": ["Voz pasiva"],
@@ -16,7 +16,7 @@ const MACRO = {
 };
 const macroOf = (t) => Object.entries(MACRO).find(([, v]) => v.includes(t))?.[0] ?? "Otros";
 
-const GUIDE = {
+export const GUIDE = {
   "Tiempos verbales": [
     "Past simple = hecho terminado con marca de tiempo (yesterday, last week, on Saturday, «she never came»).",
     "Present perfect (have/has + participio) = desde el pasado hasta ahora: how long, for, since, hasta ahora.",
@@ -84,49 +84,34 @@ const GUIDE = {
 };
 
 
-const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const L = "ABCD";
-const BANKS = { b1: ["ingles_b1", "Inglés B1", "ítems 140–189"], b2: ["ingles_b2", "Inglés B2", "ítems 1–50"] };
 
-function bankHtml(items, cat, title, rangeLabel) {
-  const qs = items.filter((q) => q.category === cat && q.tema)
-    .sort((a, b) => Number(a.id.split("-").pop()) - Number(b.id.split("-").pop()));
-  if (!qs.length) return "";
+export const BANKS = { b1: ["ingles_b1", "Inglés B1", "ítems 140–189"], b2: ["ingles_b2", "Inglés B2", "ítems 1–50"] };
+
+const idNum = (q) => Number(q.id.split("-").pop());
+
+/** Bloques de estudio de un banco ("b1" | "b2"), del que más cae al que menos:
+ *  [{ name, items, rules }]. Solo cuentan preguntas con `tema`. */
+export function studyBlocks(bank, items) {
+  const cat = BANKS[bank][0];
   const groups = {};
-  for (const q of qs) (groups[macroOf(q.tema)] ??= []).push(q);
-  const order = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
-  const total = qs.length;
-  const bars = order.map(([m, g]) => `<div class="progress-item"><div class="progress-item__head"><span>${esc(m)}</span><span>${g.length} · ${Math.round((g.length / total) * 100)} %</span></div>
-    <div class="progress-item__bar"><div class="progress-item__fill" style="width:${(g.length / order[0][1].length) * 100}%;background:var(--blue)"></div></div></div>`).join("");
-  const sections = order.map(([m, g], i) => `<div class="card" style="margin-top:10px"><div class="card__title">${i + 1}. ${esc(m)} · ${g.length} de ${total}</div>
-    <b>Qué te tienes que aprender</b><ul>${(GUIDE[m] ?? []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
-    <details><summary><b>Ver las ${g.length} preguntas con su regla</b></summary>
-    ${g.map((q) => `<p style="margin-top:10px"><b>${q.id.split("-").pop()}.</b> ${esc(q.prompt).replace("___", "_____")}<br>
-      <b>✅ ${L[q.correctIndex]}) ${esc(q.options[q.correctIndex])}</b> · <span class="note">${esc(q.tema)}</span><br><span class="note">${esc(q.explanation ?? "")}</span></p>`).join("")}
-    </details></div>`).join("");
-  return `<h2 style="margin:18px 0 4px">${title} <span class="note">${rangeLabel} · ${total} preguntas</span></h2>
-    <div class="card"><div class="card__title">Qué cae y cuánto</div><div class="progress-list">${bars}</div></div>${sections}`;
+  for (const q of items) {
+    if (q.category !== cat || !q.tema) continue;
+    (groups[macroOf(q.tema)] ??= []).push(q);
+  }
+  return Object.entries(groups)
+    .map(([name, qs]) => ({ name, items: qs.sort((a, b) => idNum(a) - idNum(b)), rules: GUIDE[name] ?? [] }))
+    .sort((a, b) => b.items.length - a.items.length);
 }
 
-/** HTML de la guía. bank: "b1" | "b2" | "all". penalty: puntos que resta cada fallo. */
-export function guideHtml(bank, items, penalty = 0.2) {
-  const keys = bank === "all" ? ["b1", "b2"] : [bank];
-  const body = keys.map((k) => bankHtml(items, ...BANKS[k])).join("");
-  if (!body) return `<p class="note">La guía se genera con las preguntas del banco: desbloquéalas primero.</p>`;
-  const p = String(penalty).replace(".", ",");
-  const guess = Math.round((0.25 - 0.75 * penalty) * 100) / 100;
-  return `<div class="card"><b>Cómo se puntúa (supuesto)</b><br>+1 por acierto y −${p} por error (frase del cuadernillo, pendiente de confirmar en las bases); se aprueba con la mitad de la nota máxima. Con 4 opciones, responder al azar rinde ${guess > 0 ? "+" : ""}${String(guess).replace(".", ",")} de media${guess > 0 ? ": no dejes ninguna en blanco" : ""}.</div>
-  ${body}
-  <h2 style="margin:22px 0 4px">Las 10 trampas que más se repiten</h2>
-  <div class="card"><ol style="margin:0;padding-left:20px">
-  <li>Tras <b>when / if / as soon as</b> en futuro: presente simple, nunca will.</li>
-  <li><b>Past simple</b> si hay marca de tiempo terminada; <b>present perfect</b> si es «hasta ahora».</li>
-  <li>Sujeto singular → <b>was / goes / has</b> (everything, the car, Maria).</li>
-  <li><b>Although / even though</b> + oración; <b>despite / in spite of</b> + sustantivo.</li>
-  <li><b>Due to / because of</b> + sustantivo; <b>because / since</b> + oración.</li>
-  <li>Incontables sin plural: <b>advice, furniture, money, sleep, flour</b>.</li>
-  <li><b>Look forward to + -ing</b>; <b>let + infinitivo sin to</b>.</li>
-  <li>Estilo indirecto: retrocede un tiempo (<b>am going → was going</b>, <b>can → could</b>).</li>
-  <li>Falsos amigos: <b>sensible ≠ sensitive</b>; <b>laboral</b> no existe.</li>
-  <li>Las colocaciones se memorizan: <b>do</b> the washing-up / a favor, <b>make</b> an appointment, <b>meet</b> a deadline.</li></ol></div>`;
-}
+export const TRAPS = [
+  "Tras <b>when / if / as soon as</b> en futuro: presente simple, nunca will.",
+  "<b>Past simple</b> si hay marca de tiempo terminada; <b>present perfect</b> si es «hasta ahora».",
+  "Sujeto singular → <b>was / goes / has</b> (everything, the car, Maria).",
+  "<b>Although / even though</b> + oración; <b>despite / in spite of</b> + sustantivo.",
+  "<b>Due to / because of</b> + sustantivo; <b>because / since</b> + oración.",
+  "Incontables sin plural: <b>advice, furniture, money, sleep, flour</b>.",
+  "<b>Look forward to + -ing</b>; <b>let + infinitivo sin to</b>.",
+  "Estilo indirecto: retrocede un tiempo (<b>am going → was going</b>, <b>can → could</b>).",
+  "Falsos amigos: <b>sensible ≠ sensitive</b>; <b>laboral</b> no existe.",
+  "Las colocaciones se memorizan: <b>do</b> the washing-up / a favor, <b>make</b> an appointment, <b>meet</b> a deadline.",
+];

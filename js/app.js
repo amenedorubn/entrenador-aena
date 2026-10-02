@@ -10,7 +10,7 @@ import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/compete
 import { loadReal, REAL } from "../data/real.js";
 import { choice, shuffle } from "./rng.js";
 import { APP_VERSION } from "./version.js";
-import { guideHtml } from "./guide.js";
+import { createStudy } from "./study.js";
 import { computePlan, feasibility, studyHoursBetween, examMs } from "./plan.js";
 import * as stats from "./stats.js";
 import { lineChart, columnChart, bindCharts } from "./charts.js";
@@ -87,7 +87,7 @@ const store = {
 
 /* ============================== utilidades DOM ============================== */
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["path", "practice", "speaking", "profile", "stats", "settings", "quality", "lesson", "results", "competencias"];
+const SCREENS = ["path", "practice", "speaking", "profile", "stats", "settings", "quality", "lesson", "results", "competencias", "study"];
 const NAV_SCREENS = new Set(["path", "practice", "speaking", "profile", "stats", "settings"]);
 
 function show(name) {
@@ -342,7 +342,7 @@ function renderPath() {
 /* ============================== sesión de lección ============================== */
 const session = {
   items: [], i: 0, correct: 0, hearts: HEARTS,
-  lessonIndex: null, practice: null, review: false, unseen: false, bank: null, wrong: 0, failed: [], selection: null, answered: false, startedAt: 0,
+  lessonIndex: null, practice: null, review: false, unseen: false, bank: null, blockIds: null, blockLabel: "", wrong: 0, failed: [], selection: null, answered: false, startedAt: 0,
   // Resultado de la pregunta en curso y cuántas se han perdonado por reportarlas (ver excuseWrong).
   verdict: null, excused: 0, itemStart: 0,
   // Página con varias preguntas del mismo audio: nº de ítems que ocupa, contenedores de opciones y respuestas.
@@ -353,7 +353,7 @@ function startLesson(index) {
   const l = LESSONS[index];
   session.lessonIndex = index;
   session.practice = null;
-  session.review = false; session.unseen = false; session.bank = null;
+  session.review = false; session.unseen = false; session.bank = null; session.blockIds = null;
   const isUnitFinal = l.lessonIndex === l.lessonsInUnit - 1;
   // La última lección de cada unidad es solo de preguntas reales (ignora el filtro de origen).
   const realsOnly = isUnitFinal ? buildRealsOnlyLesson(l.sources, l.tier, QUESTIONS_PER_LESSON) : [];
@@ -367,7 +367,7 @@ function startLesson(index) {
 function startPractice(source, tier) {
   session.lessonIndex = null;
   session.practice = { source, tier };
-  session.review = false; session.unseen = false; session.bank = null;
+  session.review = false; session.unseen = false; session.bank = null; session.blockIds = null;
   const opts = { origenFilter: store.origenFilter };
   if (source === "listen" && store.listenLevel !== "any") opts.level = store.listenLevel;
   session.items = buildLesson([source], tier, QUESTIONS_PER_LESSON, opts);
@@ -385,7 +385,7 @@ function startUnseen(n = 10) {
   session.practice = null;
   session.review = true; // sin vidas ni efecto en el camino
   session.unseen = true;
-  session.bank = null;
+  session.bank = null; session.blockIds = null;
   session.items = items;
   beginSession(`Reales pendientes · ${items.length} pregunta${items.length === 1 ? "" : "s"}`);
 }
@@ -399,7 +399,7 @@ function startReview() {
   session.practice = null;
   session.review = true;
   session.unseen = false;
-  session.bank = null;
+  session.bank = null; session.blockIds = null;
   session.items = buildReviewLesson(ids);
   const n = session.items.length;
   beginSession(`Repasar fallos · ${n} pregunta${n === 1 ? "" : "s"}`);
@@ -414,10 +414,25 @@ function startEnglishBank() {
   session.practice = null;
   session.review = true; // sin vidas ni efecto en el camino
   session.unseen = false;
-  session.bank = bank;
+  session.bank = bank; session.blockIds = null;
   session.items = items;
   const label = bank === "all" ? "Inglés B1 + B2" : `Inglés ${bank.toUpperCase()}`;
   beginSession(`${label}${onlyMissed ? " · solo fallos" : ""} · ${items.length} pregunta${items.length === 1 ? "" : "s"}`);
+}
+
+/** Examen de un tema del estudio: esas preguntas (ids) del banco elegido; al terminar se
+ *  vuelve a la pantalla de estudio. */
+function startEnglishBlock(ids, label) {
+  const items = buildReviewLesson(ids);
+  if (!items.length) return;
+  session.lessonIndex = null;
+  session.practice = null;
+  session.review = true; // sin vidas ni efecto en el camino
+  session.unseen = false;
+  session.bank = store.engBank === "b2" ? "b2" : "b1";
+  session.blockIds = ids; session.blockLabel = label;
+  session.items = items;
+  beginSession(`${label} · ${items.length} pregunta${items.length === 1 ? "" : "s"}`);
 }
 
 function beginSession(kicker) {
@@ -814,7 +829,7 @@ function finish() {
   $("results-acc").textContent = `${pct} %`;
   $("results-acc-badge").className = `badge ${passed ? "badge--acc" : "badge--fail"}`;
   $("results-repeat").classList.toggle("hidden",
-    session.bank ? store.engMode === "missed" && stillMissed === 0
+    session.blockIds ? false : session.bank ? store.engMode === "missed" && stillMissed === 0
       : session.unseen ? cov.unseen === 0 : stillMissed === 0);
   show("results");
 }
@@ -858,7 +873,6 @@ function renderEnglishBank() {
       : `${total} preguntas, ${missed} fallada${missed === 1 ? "" : "s"} pendiente${missed === 1 ? "" : "s"}.`;
   $("eng-start").disabled = n === 0;
   $("eng-fails").classList.add("hidden");
-  $("eng-guide").classList.add("hidden");
 }
 
 /** Un mismo valor persistente (store.origenFilter), pintado en dos sitios (Práctica
@@ -1233,7 +1247,10 @@ function copyQualityReport() {
 }
 
 /* ============================== navegación ============================== */
+let studyView = null;
+
 function goto(name) {
+  if (name === "study") studyView.open();
   if (name === "path") renderPath();
   if (name === "practice") renderPractice();
   if (name === "profile") renderProfile();
@@ -1284,12 +1301,13 @@ function init() {
   $("lesson-quit").addEventListener("click", () => {
     stopSpeech();
     if (session.i > 0 && !window.confirm("¿Salir de la lección? Perderás el progreso de esta sesión.")) return;
-    goto("path");
+    goto(session.blockIds ? "study" : "path");
   });
 
-  $("results-continue").addEventListener("click", () => goto("path"));
+  $("results-continue").addEventListener("click", () => goto(session.blockIds ? "study" : "path"));
   $("results-repeat").addEventListener("click", () => {
     if (session.lessonIndex !== null) startLesson(session.lessonIndex);
+    else if (session.blockIds) startEnglishBlock(session.blockIds, session.blockLabel);
     else if (session.bank) startEnglishBank();
     else if (session.unseen) startUnseen();
     else if (session.review) startReview();
@@ -1303,11 +1321,15 @@ function init() {
   document.querySelectorAll("#eng-mode button").forEach((b) =>
     b.addEventListener("click", () => { store.engMode = b.dataset.mode; renderEnglishBank(); }));
   $("eng-start").addEventListener("click", startEnglishBank);
-  $("eng-guide-btn").addEventListener("click", () => {
-    const box = $("eng-guide");
-    if (!box.classList.contains("hidden")) { box.classList.add("hidden"); return; }
-    box.innerHTML = guideHtml(store.engBank, REAL, WRONG_PENALTY);
-    box.classList.remove("hidden");
+  $("eng-guide-btn").addEventListener("click", () => goto("study"));
+  $("study-back").addEventListener("click", () => goto("practice"));
+  studyView = createStudy($("study-body"), {
+    items: () => REAL,
+    seen: () => store.seenIds,
+    missed: () => store.missedIds,
+    bank: () => (store.engBank === "b2" ? "b2" : "b1"),
+    setBank: (b) => { store.engBank = b; },
+    startBlock: startEnglishBlock,
   });
   $("eng-fails-btn").addEventListener("click", () => {
     const box = $("eng-fails");
