@@ -239,6 +239,31 @@ export function buildReviewLesson(ids) {
   return shuffle(items.map((q) => toRealItem(q, CATEGORY_SOURCE[q.category], q.lvl ?? 3)).filter(Boolean));
 }
 
+/** Bancos de inglés oficial servibles por separado (Práctica libre -> "Inglés oficial"). */
+export const ENGLISH_BANKS = { b1: "ingles_b1", b2: "ingles_b2" };
+
+const englishBankPool = (bank) => {
+  const cats = bank === "all" ? Object.values(ENGLISH_BANKS) : [ENGLISH_BANKS[bank]];
+  return REAL.filter((q) => cats.includes(q.category) && q.status !== "revision");
+};
+
+/** {total, missed} del banco ("b1" | "b2" | "all") dado el conjunto de ids fallados. */
+export function englishBankCounts(bank, missedIds) {
+  const missed = new Set(missedIds);
+  const pool = englishBankPool(bank);
+  return { total: pool.length, missed: pool.filter((q) => missed.has(q.id)).length };
+}
+
+/**
+ * Sesión con TODAS las preguntas oficiales del banco elegido (o solo las falladas con
+ * onlyMissed), orden barajado. Como Repasar fallos: no aplica REAL_CHANCE ni deduplicación.
+ */
+export function buildEnglishBankLesson(bank, { onlyMissed = false, missedIds = [] } = {}) {
+  const missed = new Set(missedIds);
+  const pool = englishBankPool(bank).filter((q) => !onlyMissed || missed.has(q.id));
+  return shuffle(pool.map((q) => toRealItem(q, CATEGORY_SOURCE[q.category], q.lvl ?? 3)).filter(Boolean));
+}
+
 function sjtItem(tier = 3) {
   const pool = SJT.filter((x) => Math.abs(x.lvl - tier) <= 1);
   const source = pool.length ? pool : SJT;

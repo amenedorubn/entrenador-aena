@@ -7,4 +7,4 @@
 // Sube esto A LA VEZ que CACHE_VERSION en service-worker.js cada vez que cambie algo
 // que el usuario pueda notar (datos, UI, lógica) — si solo subes una de las dos, el
 // indicador de versión deja de servir para diagnosticar caché desactualizada.
-export const APP_VERSION = "v34 · 2026-10-01";
+export const APP_VERSION = "v35 · 2026-10-02";

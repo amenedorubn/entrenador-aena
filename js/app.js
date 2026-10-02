@@ -2,7 +2,7 @@ import {
   WORLDS, LESSONS, PASS_THRESHOLD, QUESTIONS_PER_LESSON, HEARTS,
   isPassed, lessonState, currentLessonIndex, unitProgress, worldProgress, worldUnlocked, totalPassed,
 } from "./curriculum.js";
-import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES, setSeenIds, realCoverage, buildUnseenLesson, buildRealsOnlyLesson } from "./content.js";
+import { buildLesson, buildReviewLesson, makeItem, SOURCE_LABELS, SOURCES, setSeenIds, realCoverage, buildUnseenLesson, buildRealsOnlyLesson, buildEnglishBankLesson, englishBankCounts } from "./content.js";
 import { renderQuestion, renderListenGroup, renderOptions, renderWordbank, markOptions, lockWordbank, speakItem, stopSpeech, optionText, transcriptText } from "./engine.js";
 import { LEVELS as LISTEN_LEVELS, LEVEL_LABEL as LISTEN_LEVEL_LABEL } from "../data/listening.js";
 import { SPEAKING_PROMPTS } from "../data/english.js";
@@ -50,6 +50,12 @@ const store = {
   // Ids de preguntas REALES falladas la última vez que se sirvieron, para "Repasar
   // fallos". Se quita un id en cuanto se responde bien (refleja lo que sigue
   // pendiente, no un historial de todo lo que alguna vez se falló).
+  // Banco de "Inglés oficial" elegido en Práctica libre ("b1" | "b2" | "all") y si solo
+  // se sirven las falladas ("all" | "missed").
+  get engBank() { return get("engBank", "b1"); },
+  set engBank(v) { set("engBank", v); },
+  get engMode() { return get("engMode", "all"); },
+  set engMode(v) { set("engMode", v); },
   get missedIds() { return get("missedIds", []); },
   set missedIds(v) { set("missedIds", v); },
   // Preguntas reales que el propio usuario marcó con "Reportar fallo" tras responder.
@@ -335,7 +341,7 @@ function renderPath() {
 /* ============================== sesión de lección ============================== */
 const session = {
   items: [], i: 0, correct: 0, hearts: HEARTS,
-  lessonIndex: null, practice: null, review: false, unseen: false, selection: null, answered: false, startedAt: 0,
+  lessonIndex: null, practice: null, review: false, unseen: false, bank: null, selection: null, answered: false, startedAt: 0,
   // Resultado de la pregunta en curso y cuántas se han perdonado por reportarlas (ver excuseWrong).
   verdict: null, excused: 0, itemStart: 0,
   // Página con varias preguntas del mismo audio: nº de ítems que ocupa, contenedores de opciones y respuestas.
@@ -346,7 +352,7 @@ function startLesson(index) {
   const l = LESSONS[index];
   session.lessonIndex = index;
   session.practice = null;
-  session.review = false; session.unseen = false;
+  session.review = false; session.unseen = false; session.bank = null;
   const isUnitFinal = l.lessonIndex === l.lessonsInUnit - 1;
   // La última lección de cada unidad es solo de preguntas reales (ignora el filtro de origen).
   const realsOnly = isUnitFinal ? buildRealsOnlyLesson(l.sources, l.tier, QUESTIONS_PER_LESSON) : [];
@@ -360,7 +366,7 @@ function startLesson(index) {
 function startPractice(source, tier) {
   session.lessonIndex = null;
   session.practice = { source, tier };
-  session.review = false; session.unseen = false;
+  session.review = false; session.unseen = false; session.bank = null;
   const opts = { origenFilter: store.origenFilter };
   if (source === "listen" && store.listenLevel !== "any") opts.level = store.listenLevel;
   session.items = buildLesson([source], tier, QUESTIONS_PER_LESSON, opts);
@@ -378,6 +384,7 @@ function startUnseen(n = 10) {
   session.practice = null;
   session.review = true; // sin vidas ni efecto en el camino
   session.unseen = true;
+  session.bank = null;
   session.items = items;
   beginSession(`Reales pendientes · ${items.length} pregunta${items.length === 1 ? "" : "s"}`);
 }
@@ -391,9 +398,25 @@ function startReview() {
   session.practice = null;
   session.review = true;
   session.unseen = false;
+  session.bank = null;
   session.items = buildReviewLesson(ids);
   const n = session.items.length;
   beginSession(`Repasar fallos · ${n} pregunta${n === 1 ? "" : "s"}`);
+}
+
+/** Sesión del banco de inglés oficial (B1, B2 o ambos), entero o solo los fallos. */
+function startEnglishBank() {
+  const bank = store.engBank, onlyMissed = store.engMode === "missed";
+  const items = buildEnglishBankLesson(bank, { onlyMissed, missedIds: store.missedIds });
+  if (!items.length) return;
+  session.lessonIndex = null;
+  session.practice = null;
+  session.review = true; // sin vidas ni efecto en el camino
+  session.unseen = false;
+  session.bank = bank;
+  session.items = items;
+  const label = bank === "all" ? "Inglés B1 + B2" : `Inglés ${bank.toUpperCase()}`;
+  beginSession(`${label}${onlyMissed ? " · solo fallos" : ""} · ${items.length} pregunta${items.length === 1 ? "" : "s"}`);
 }
 
 function beginSession(kicker) {
@@ -713,7 +736,8 @@ function finish() {
     if (pct > (prog[key] ?? 0)) { prog[key] = pct; store.progress = prog; }
   }
 
-  const stillMissed = session.review ? store.missedIds.length : null;
+  const stillMissed = session.bank ? englishBankCounts(session.bank, store.missedIds).missed
+    : session.review ? store.missedIds.length : null;
 
   $("results-spark").textContent = ranOut ? "💔" : passed ? (pct === 100 ? "🌟" : "🎉") : "💪";
   const cov = realCoverage();
@@ -738,7 +762,9 @@ function finish() {
   $("results-xp").textContent = `+${xpGain}`;
   $("results-acc").textContent = `${pct} %`;
   $("results-acc-badge").className = `badge ${passed ? "badge--acc" : "badge--fail"}`;
-  $("results-repeat").classList.toggle("hidden", session.unseen ? cov.unseen === 0 : stillMissed === 0);
+  $("results-repeat").classList.toggle("hidden",
+    session.bank ? store.engMode === "missed" && stillMissed === 0
+      : session.unseen ? cov.unseen === 0 : stillMissed === 0);
   show("results");
 }
 
@@ -765,6 +791,21 @@ function renderPractice() {
     b.setAttribute("aria-pressed", String(b.dataset.level === level)));
 
   paintOrigenFilter("#practice-origen-filter");
+  renderEnglishBank();
+}
+
+function renderEnglishBank() {
+  const { engBank: bank, engMode: mode } = store;
+  document.querySelectorAll("#eng-bank button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.bank === bank)));
+  document.querySelectorAll("#eng-mode button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+  const { total, missed } = englishBankCounts(bank, store.missedIds);
+  const n = mode === "missed" ? missed : total;
+  $("eng-count").textContent = total === 0
+    ? "El banco aún no está cargado: desbloquea las preguntas reales primero."
+    : mode === "missed"
+      ? (missed ? `${missed} fallo${missed === 1 ? "" : "s"} pendiente${missed === 1 ? "" : "s"} de ${total}.` : `Ningún fallo pendiente (${total} preguntas en el banco).`)
+      : `${total} preguntas, ${missed} fallada${missed === 1 ? "" : "s"} pendiente${missed === 1 ? "" : "s"}.`;
+  $("eng-start").disabled = n === 0;
 }
 
 /** Un mismo valor persistente (store.origenFilter), pintado en dos sitios (Práctica
@@ -1196,6 +1237,7 @@ function init() {
   $("results-continue").addEventListener("click", () => goto("path"));
   $("results-repeat").addEventListener("click", () => {
     if (session.lessonIndex !== null) startLesson(session.lessonIndex);
+    else if (session.bank) startEnglishBank();
     else if (session.unseen) startUnseen();
     else if (session.review) startReview();
     else startPractice(session.practice.source, session.practice.tier);
@@ -1203,6 +1245,11 @@ function init() {
 
   document.querySelectorAll("#practice-tier button").forEach((b) =>
     b.addEventListener("click", () => { store.practiceTier = Number(b.dataset.tier); renderPractice(); }));
+  document.querySelectorAll("#eng-bank button").forEach((b) =>
+    b.addEventListener("click", () => { store.engBank = b.dataset.bank; renderEnglishBank(); }));
+  document.querySelectorAll("#eng-mode button").forEach((b) =>
+    b.addEventListener("click", () => { store.engMode = b.dataset.mode; renderEnglishBank(); }));
+  $("eng-start").addEventListener("click", startEnglishBank);
   document.querySelectorAll("#practice-listen-level button").forEach((b) =>
     b.addEventListener("click", () => { store.listenLevel = b.dataset.level; renderPractice(); }));
   document.querySelectorAll("#practice-origen-filter button, #settings-origen-filter button").forEach((b) =>

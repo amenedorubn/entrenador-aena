@@ -79,6 +79,22 @@
     </div>
 
     <div class="card">
+      <div class="card__title">Inglés oficial</div>
+      <p class="note">Las preguntas reales de inglés del examen, por banco. B1 = ítems 140–189, B2 = ítems 1–50. Sin vidas.</p>
+      <div class="segmented" id="eng-bank" role="group" aria-label="Banco de inglés" style="margin-top:10px">
+        <button type="button" data-bank="b1" aria-pressed="false">Inglés B1</button>
+        <button type="button" data-bank="b2" aria-pressed="false">Inglés B2</button>
+        <button type="button" data-bank="all" aria-pressed="false">Ambos</button>
+      </div>
+      <div class="segmented" id="eng-mode" role="group" aria-label="Qué preguntas" style="margin-top:10px">
+        <button type="button" data-mode="all" aria-pressed="true">Todas</button>
+        <button type="button" data-mode="missed" aria-pressed="false">Solo fallos</button>
+      </div>
+      <p class="note" id="eng-count" style="margin-top:10px"></p>
+      <button type="button" class="btn btn--blue btn--wide" id="eng-start" style="margin-top:6px">Empezar</button>
+    </div>
+
+    <div class="card">
       <div class="card__title">Nivel de listening (solo bloque Listening)</div>
       <div class="segmented" id="practice-listen-level" role="group" aria-label="Nivel de listening">
         <button type="button" data-level="any" aria-pressed="true">Cualquiera</button>
