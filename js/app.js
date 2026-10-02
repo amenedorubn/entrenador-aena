@@ -10,6 +10,7 @@ import { LIKERT_SCALE, LIKERT_ITEMS, FORCED_CHOICE_ITEMS } from "../data/compete
 import { loadReal, REAL } from "../data/real.js";
 import { choice, shuffle } from "./rng.js";
 import { APP_VERSION } from "./version.js";
+import { guideHtml } from "./guide.js";
 import { computePlan, feasibility, studyHoursBetween, examMs } from "./plan.js";
 import * as stats from "./stats.js";
 import { lineChart, columnChart, bindCharts } from "./charts.js";
@@ -857,6 +858,7 @@ function renderEnglishBank() {
       : `${total} preguntas, ${missed} fallada${missed === 1 ? "" : "s"} pendiente${missed === 1 ? "" : "s"}.`;
   $("eng-start").disabled = n === 0;
   $("eng-fails").classList.add("hidden");
+  $("eng-guide").classList.add("hidden");
 }
 
 /** Un mismo valor persistente (store.origenFilter), pintado en dos sitios (Práctica
@@ -1301,6 +1303,12 @@ function init() {
   document.querySelectorAll("#eng-mode button").forEach((b) =>
     b.addEventListener("click", () => { store.engMode = b.dataset.mode; renderEnglishBank(); }));
   $("eng-start").addEventListener("click", startEnglishBank);
+  $("eng-guide-btn").addEventListener("click", () => {
+    const box = $("eng-guide");
+    if (!box.classList.contains("hidden")) { box.classList.add("hidden"); return; }
+    box.innerHTML = guideHtml(store.engBank, REAL, WRONG_PENALTY);
+    box.classList.remove("hidden");
+  });
   $("eng-fails-btn").addEventListener("click", () => {
     const box = $("eng-fails");
     if (!box.classList.contains("hidden")) { box.classList.add("hidden"); return; }
