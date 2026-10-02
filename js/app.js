@@ -341,7 +341,7 @@ function renderPath() {
 /* ============================== sesión de lección ============================== */
 const session = {
   items: [], i: 0, correct: 0, hearts: HEARTS,
-  lessonIndex: null, practice: null, review: false, unseen: false, bank: null, selection: null, answered: false, startedAt: 0,
+  lessonIndex: null, practice: null, review: false, unseen: false, bank: null, wrong: 0, selection: null, answered: false, startedAt: 0,
   // Resultado de la pregunta en curso y cuántas se han perdonado por reportarlas (ver excuseWrong).
   verdict: null, excused: 0, itemStart: 0,
   // Página con varias preguntas del mismo audio: nº de ítems que ocupa, contenedores de opciones y respuestas.
@@ -420,7 +420,7 @@ function startEnglishBank() {
 }
 
 function beginSession(kicker) {
-  session.i = 0; session.correct = 0; session.excused = 0; session.verdict = null; session.startedAt = Date.now();
+  session.i = 0; session.correct = 0; session.wrong = 0; session.excused = 0; session.verdict = null; session.startedAt = Date.now();
   session.hearts = store.heartsOn && session.practice === null && !session.review ? HEARTS : Infinity;
   $("lesson-kicker").textContent = kicker;
   $("lesson-hearts").classList.toggle("hidden", session.hearts === Infinity);
@@ -443,6 +443,20 @@ function ensureRenderable(item) {
   return candidate;
 }
 
+// Examen de inglés (bancos de 50): cada fallo resta WRONG_PENALTY aciertos (el cuadernillo
+// real puntúa +1 por acierto y -0,20 por error) y se aprueba con la mitad de la nota máxima.
+const WRONG_PENALTY = 0.2;
+const fmtNum = (x) => String(Math.round(x * 100) / 100).replace(".", ",");
+
+/** Marcador en vivo de las sesiones de banco: llevo X de N, aciertos y fallos. */
+function paintBankTally() {
+  const el = $("bank-tally");
+  el.classList.toggle("hidden", !session.bank);
+  if (!session.bank) return;
+  const done = session.correct + session.wrong;
+  el.textContent = `Llevas ${done} de ${session.items.length} · ✅ ${session.correct} aciertos · ❌ ${session.wrong} fallos`;
+}
+
 function renderCurrentItem() {
   const item = ensureRenderable(session.items[session.i]);
   session.items[session.i] = item;
@@ -452,6 +466,7 @@ function renderCurrentItem() {
 
   $("lesson-progress").style.width = `${(session.i / session.items.length) * 100}%`;
   $("hearts-count").textContent = session.hearts;
+  paintBankTally();
   $("feedback").classList.remove("show", "good", "bad");
   $("check-foot").classList.remove("hidden");
   const check = $("check-btn");
@@ -514,7 +529,7 @@ function evaluateGroup() {
     markOptions(session.groupBoxes[i], it.correctIndex, session.groupSel[i]);
     logAnswer(it, good);
     if (good) session.correct++;
-    else if (session.hearts !== Infinity) session.hearts = Math.max(0, session.hearts - 1);
+    else { session.wrong++; if (session.hearts !== Infinity) session.hearts = Math.max(0, session.hearts - 1); }
     return { it, good, mine: session.groupSel[i] };
   });
   $("hearts-count").textContent = session.hearts;
@@ -568,8 +583,9 @@ function evaluate() {
   const heartLost = !good && session.hearts !== Infinity && session.hearts > 0;
   session.verdict = { good, heartLost, excused: false };
   if (good) session.correct++;
-  else if (session.hearts !== Infinity) session.hearts = Math.max(0, session.hearts - 1);
+  else { session.wrong++; if (session.hearts !== Infinity) session.hearts = Math.max(0, session.hearts - 1); }
   $("hearts-count").textContent = session.hearts;
+  paintBankTally();
 
   // Solo las preguntas reales tienen id estable entre sesiones (las generadas se
   // recrean cada vez, no hay "la misma" que repasar). Se guarda mientras se siga
@@ -759,6 +775,10 @@ function finish() {
       : passed
         ? (session.lessonIndex !== null ? "Has desbloqueado la siguiente lección." : "Buen trabajo. Sigue practicando.")
         : `Necesitas un ${PASS_THRESHOLD * 100} % para superar la lección. Repasa las explicaciones y repite.`;
+  if (session.bank) {
+    const net = session.correct - WRONG_PENALTY * session.wrong, need = total / 2;
+    $("results-sub").textContent = `${session.correct} aciertos y ${session.wrong} fallos de ${total}. Nota: ${session.correct} − ${fmtNum(WRONG_PENALTY)}×${session.wrong} = ${fmtNum(net)} de ${total}. Hay que llegar a ${fmtNum(need)}: ${net >= need ? "APROBADO" : "NO llegas"}.`;
+  }
   $("results-xp").textContent = `+${xpGain}`;
   $("results-acc").textContent = `${pct} %`;
   $("results-acc-badge").className = `badge ${passed ? "badge--acc" : "badge--fail"}`;
