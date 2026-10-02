@@ -1,6 +1,6 @@
 // Service worker — cachea el shell estático para uso offline básico.
 // Sube CACHE_VERSION cuando cambies archivos precacheados para forzar la actualización.
-const CACHE_VERSION = "v39";
+const CACHE_VERSION = "v40";
 const CACHE_NAME = `aena-${CACHE_VERSION}`;
 // Las imágenes de examen (MB cada una) van a una caché que NO se borra al subir de versión:
 // así no se vuelven a descargar en cada actualización y, una vez vistas, cargan sin red.
@@ -60,7 +60,25 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Cache-first para el shell propio; red directa (sin interceptar) para orígenes externos (p. ej. Google Fonts).
+// Red primero (revalidando, sin fiarse de la caché HTTP de GitHub Pages: max-age=600) con
+// la caché del service worker como respaldo offline o si la red tarda más de NET_TIMEOUT.
+// Antes era cache-first: con la app instalada se quedaba sirviendo el código viejo hasta
+// que el service worker nuevo se instalaba, tomaba el control y el usuario recargaba.
+// Orígenes externos (p. ej. Google Fonts): sin interceptar.
+const NET_TIMEOUT = 4000;
+
+function fromNetwork(req) {
+  const fetched = fetch(req, { cache: "no-cache" });
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), NET_TIMEOUT));
+  return Promise.race([fetched, timeout]).then((res) => {
+    if (res && res.ok) {
+      const copy = res.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+    }
+    return res;
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
@@ -84,17 +102,8 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => (req.mode === "navigate" ? caches.match("./index.html") : Response.error()));
-    })
+    fromNetwork(req).catch(() =>
+      caches.match(req).then((cached) => cached
+        || (req.mode === "navigate" ? caches.match("./index.html") : Response.error())))
   );
 });

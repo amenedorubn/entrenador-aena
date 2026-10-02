@@ -1386,7 +1386,7 @@ function init() {
 
   $("check-update").addEventListener("click", checkForUpdate);
   $("force-update").addEventListener("click", hardResetApp);
-  $("update-reload").addEventListener("click", () => window.location.reload());
+  $("update-reload").addEventListener("click", cleanReload);
 
   goto("path");
   initServiceWorker();
@@ -1420,11 +1420,38 @@ function initServiceWorker() {
       .then((reg) => {
         swRegistration = reg;
         document.addEventListener("visibilitychange", () => {
-          if (document.visibilityState === "visible") reg.update().catch(() => {});
+          if (document.visibilityState === "visible") { reg.update().catch(() => {}); checkServerVersion(); }
         });
       })
       .catch(() => {});
+    checkServerVersion();
+    setInterval(checkServerVersion, 5 * 60 * 1000);
   });
+}
+
+/** Red de seguridad independiente del service worker: pide version.js al servidor sin
+ *  caché y, si su versión no es la del código que está corriendo, avisa con el banner. */
+async function checkServerVersion() {
+  try {
+    const res = await fetch(`./js/version.js?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return;
+    const m = /APP_VERSION\s*=\s*"([^"]+)"/.exec(await res.text());
+    if (m && m[1] !== APP_VERSION) {
+      $("update-status").textContent = "";
+      $("update-banner").hidden = false;
+    }
+  } catch { /* sin red: nada que comparar */ }
+}
+
+/** Desregistra el service worker, borra sus cachés y recarga (el progreso vive en
+ *  localStorage y no se toca). Es lo que hace "Actualizar ahora" del banner. */
+function cleanReload() {
+  const done = () => window.location.reload();
+  if (!("serviceWorker" in navigator)) { done(); return; }
+  navigator.serviceWorker.getRegistrations()
+    .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+    .then(() => ("caches" in window ? caches.keys().then((keys) => Promise.all(keys.filter((k) => !k.startsWith("aena-img")).map((k) => caches.delete(k)))) : null))
+    .finally(done);
 }
 
 function checkForUpdate() {
