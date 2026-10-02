@@ -240,7 +240,7 @@ button { font-family: inherit; cursor: pointer; }
    tomó el control en segundo plano, pero recargar de golpe podría tirar una lección a
    medias, así que se pide confirmación con un toque. */
 .update-banner {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
   display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
   background: var(--blue); color: #fff; font-weight: 800; font-size: 14px;
   padding: calc(10px + env(safe-area-inset-top)) 16px 10px;

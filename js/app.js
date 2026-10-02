@@ -1411,7 +1411,6 @@ function init() {
   $("update-reload").addEventListener("click", cleanReload);
 
   goto("path");
-  initServiceWorker();
 }
 
 /* ============================== service worker / actualizaciones ==============================
@@ -1437,7 +1436,11 @@ function initServiceWorker() {
     $("update-banner").hidden = false;
   });
 
-  window.addEventListener("load", () => {
+  // Esto corre al cargar la página, ANTES de la pantalla de contraseña. Antes colgaba de
+  // init() (que solo se ejecuta tras desbloquear, con el evento "load" ya pasado), así que
+  // el service worker nunca se registraba ni se comprobaba la versión: la causa de que la
+  // app se quedara en versiones viejas.
+  const start = () => {
     navigator.serviceWorker.register("./service-worker.js")
       .then((reg) => {
         swRegistration = reg;
@@ -1448,7 +1451,9 @@ function initServiceWorker() {
       .catch(() => {});
     checkServerVersion();
     setInterval(checkServerVersion, 5 * 60 * 1000);
-  });
+  };
+  if (document.readyState === "complete") start();
+  else window.addEventListener("load", start);
 }
 
 /** Red de seguridad independiente del service worker: pide version.js al servidor sin
@@ -1459,6 +1464,13 @@ async function checkServerVersion() {
     if (!res.ok) return;
     const m = /APP_VERSION\s*=\s*"([^"]+)"/.exec(await res.text());
     if (m && m[1] !== APP_VERSION) {
+      // Aún en la pantalla de contraseña no hay nada que perder: se actualiza solo (una vez
+      // por versión, para no entrar en bucle si el servidor aún está publicando).
+      if ($("gate-overlay") && sessionStorage.getItem("aena-autoupdate") !== m[1]) {
+        sessionStorage.setItem("aena-autoupdate", m[1]);
+        cleanReload();
+        return;
+      }
       $("update-status").textContent = "";
       $("update-banner").hidden = false;
     }
@@ -1569,4 +1581,4 @@ function checkGate() {
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
   input.focus();
 }
-document.addEventListener("DOMContentLoaded", checkGate);
+document.addEventListener("DOMContentLoaded", () => { initServiceWorker(); checkGate(); });
